@@ -10,7 +10,7 @@ This Terraform module provisions the required resources for Observability Platfo
 
 ```hcl
 module "observability_platform_tenant" {
-  source = "https://github.com/ministryofjustice/terraform-aws-observability-platform-tenant.git"
+  source = "ministryofjustice/observability-platform-tenant/aws"
 
   observability_platform_account_id = local.environment_management.account_ids["observability-platform-production"]
 }
