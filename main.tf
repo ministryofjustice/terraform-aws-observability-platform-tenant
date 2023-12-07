@@ -12,6 +12,8 @@ resource "aws_iam_role" "this" {
   name               = var.role_name
   path               = "/"
   assume_role_policy = data.aws_iam_policy_document.assume.json
+
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "cloudwatch_readonly_access" {
