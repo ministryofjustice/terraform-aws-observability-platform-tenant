@@ -9,8 +9,14 @@ variable "observability_platform_account_id" {
   description = "Account ID of the Observability Platform environment. If you are running on Modernisation Platform you can use 'local.environment_management.account_ids[\"observability-platform-production\"]"
 }
 
+variable "enable_xray" {
+  type        = bool
+  description = "Enable AWS X-Ray's read only managed policy"
+  default     = false
+}
+
 variable "tags" {
   type        = map(string)
-  default     = {}
   description = "Tags to apply to resources"
+  default     = {}
 }
