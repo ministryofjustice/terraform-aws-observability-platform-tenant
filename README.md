@@ -21,4 +21,4 @@ module "observability_platform_tenant" {
 
 ### Contributing
 
-The base branch requires _all_ commits to be signed. Learn more about signing commits [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification). 
+The base branch requires _all_ commits to be signed. Learn more about signing commits [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
