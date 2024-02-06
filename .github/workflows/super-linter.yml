@@ -33,3 +33,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BRANCH: main
+          ### DEBUG
+          ACTIONS_RUNNER_DEBUG: true
+          LOG_LEVEL: DEBUG
+          ### DEBUG
