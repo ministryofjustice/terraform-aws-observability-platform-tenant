@@ -1,13 +1,4 @@
 /* Based on https://docs.localstack.cloud/user-guide/integrations/terraform/#final-configuration */
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
 provider "aws" {
   region     = "us-east-1"
   access_key = "mock_access_key"
@@ -23,9 +14,15 @@ provider "aws" {
   }
 }
 
-module "observability_platform_tenant" {
-  source = "../"
-
+variables {
   observability_platform_account_id = "111111111111"
-  enable_xray                       = true
+}
+
+run "main" {
+  command = apply
+
+  assert {
+    condition     = aws_iam_role.this.id == "observability-platform"
+    error_message = "Invalid IAM role name"
+  }
 }

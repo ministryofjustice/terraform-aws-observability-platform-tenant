@@ -23,11 +23,11 @@ module "observability_platform_tenant" {
 ## Testing
 
 ```bash
-docker-compose --file docker-compose-localstack.yml --project-name localstack up --detach
+docker-compose --file tests/docker-compose-localstack.yml --project-name localstack up --detach
 
-tflocal plan -compact-warnings
+tflocal init
 
-tflocal apply -auto-approve -compact-warnings
+tflocal test
 ```
 
 ### Contributing
