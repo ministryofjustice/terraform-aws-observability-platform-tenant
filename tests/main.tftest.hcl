@@ -26,3 +26,23 @@ run "main" {
     error_message = "Invalid IAM role name"
   }
 }
+
+run "invalid_account_id" {
+  command = plan
+
+  variables {
+    observability_platform_account_id = "1234567890"
+  }
+
+  expect_failures = [var.observability_platform_account_id]
+}
+
+run "invalid_role_name" {
+  command = plan
+
+  variables {
+    role_name = "bad-role-name"
+  }
+
+  expect_failures = [var.role_name]
+}
