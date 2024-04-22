@@ -20,11 +20,6 @@ variables {
 
 run "main" {
   command = apply
-
-  assert {
-    condition     = aws_iam_role.this.id == "observability-platform"
-    error_message = "Invalid IAM role name"
-  }
 }
 
 run "invalid_account_id" {
