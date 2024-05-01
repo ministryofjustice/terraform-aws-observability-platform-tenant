@@ -1,0 +1,31 @@
+---
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4.1.3
+
+      - name: Install LocalStack Tools
+        id: install_localstack_tools
+        run: |
+          pip install --requirement requirements-dev.txt
+
+      - name: Test
+        id: test
+        shell: bash
+        run: |
+          make test
