@@ -41,3 +41,13 @@ run "invalid_role_name" {
 
   expect_failures = [var.role_name]
 }
+
+run "additional_polcies" {
+  command = plan
+
+  variables {
+    additional_polcies = {
+      AmazonPrometheusQueryAccess = "arn:aws:iam::aws:policy/AmazonPrometheusQueryAccess"
+    }
+  }
+}

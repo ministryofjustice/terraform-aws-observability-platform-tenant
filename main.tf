@@ -27,3 +27,10 @@ resource "aws_iam_role_policy_attachment" "xray_readonly_access" {
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess"
 }
+
+resource "aws_iam_role_policy_attachment" "additional_policies" {
+  for_each = { for k, v in var.additional_policies : k => v }
+
+  role       = aws_iam_role.this.name
+  policy_arn = each.value
+}

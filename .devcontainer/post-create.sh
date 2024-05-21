@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Upgrade Pip
-pip install --upgrade pip
+pip install --break-system-packages --upgrade pip
 
 # Install dependencies
-pip install --requirement requirements-dev.txt
+pip install --break-system-package --requirement requirements-dev.txt
