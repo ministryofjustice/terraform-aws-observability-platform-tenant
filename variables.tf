@@ -17,6 +17,12 @@ variable "observability_platform_account_id" {
   }
 }
 
+variable "enable_prometheus" {
+  type        = bool
+  description = "Enable AWS Managed Prometheus' query access managed policy"
+  default     = false
+}
+
 variable "enable_xray" {
   type        = bool
   description = "Enable AWS X-Ray's read only managed policy"

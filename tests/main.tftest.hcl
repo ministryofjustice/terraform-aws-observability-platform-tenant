@@ -47,7 +47,7 @@ run "additional_polcies" {
 
   variables {
     additional_polcies = {
-      AmazonPrometheusQueryAccess = "arn:aws:iam::aws:policy/AmazonPrometheusQueryAccess"
+      AmazonDevOpsGuruReadOnlyAccess = "arn:aws:iam::aws:policy/AmazonDevOpsGuruReadOnlyAccess"
     }
   }
 }
