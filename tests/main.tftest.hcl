@@ -42,11 +42,11 @@ run "invalid_role_name" {
   expect_failures = [var.role_name]
 }
 
-run "additional_polcies" {
+run "additional_policies" {
   command = plan
 
   variables {
-    additional_polcies = {
+    additional_policies = {
       AmazonDevOpsGuruReadOnlyAccess = "arn:aws:iam::aws:policy/AmazonDevOpsGuruReadOnlyAccess"
     }
   }
