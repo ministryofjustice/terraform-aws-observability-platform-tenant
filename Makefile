@@ -1,3 +1,5 @@
+.PHONY: test
+
 test:
 	docker compose --file tests/docker-compose-localstack.yml --project-name localstack up --detach
 	tflocal init
