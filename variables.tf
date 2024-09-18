@@ -29,6 +29,18 @@ variable "enable_xray" {
   default     = false
 }
 
+variable "enable_athena" {
+  type        = bool
+  description = "Enable AWS Athena Full managed policy"
+  default     = false
+}
+
+# variable "enable_athena" {
+#   type        = bool
+#   description = "Enable custom Athena read only policy"
+#   default     = false
+# }
+
 variable "additional_policies" {
   type        = map(string)
   description = "ARNs of any policies to attach to the IAM role"

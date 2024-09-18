@@ -35,6 +35,21 @@ resource "aws_iam_role_policy_attachment" "xray_readonly_access" {
   policy_arn = "arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess"
 }
 
+# resource "aws_iam_role_policy_attachment" "athena_readonly_access" {
+#   count = var.enable_athena ? 1 : 0
+
+#   role       = aws_iam_role.this.name
+#   policy_arn = "arn:aws:iam::aws:policy/AmazonAthenaFullAccess"
+# }
+
+# this is purely for testing, at first glance there is not a read only policy for athena
+resource "aws_iam_role_policy_attachment" "athena_full_access" {
+  count = var.enable_athena ? 1 : 0
+
+  role       = aws_iam_role.this.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonAthenaFullAccess"
+}
+
 resource "aws_iam_role_policy_attachment" "additional_policies" {
   for_each = { for k, v in var.additional_policies : k => v }
 
