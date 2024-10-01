@@ -31,20 +31,24 @@ variable "enable_xray" {
 
 variable "enable_athena" {
   type        = bool
-  description = "Enable AWS Athena Full managed policy"
+  description = "Enable AWS Athena custom policy"
   default     = false
 }
-
-# variable "enable_athena" {
-#   type        = bool
-#   description = "Enable custom Athena read only policy"
-#   default     = false
-# }
 
 variable "additional_policies" {
   type        = map(string)
   description = "ARNs of any policies to attach to the IAM role"
   default     = {}
+}
+
+variable "grafana_athena_query_results_s3_bucket" {
+  description = "The S3 bucket for Grafana Athena query results"
+  type        = string
+}
+
+variable "cost_usage_reports_s3_bucket" {
+  description = "The S3 bucket for Cost and Usage reports"
+  type        = string
 }
 
 variable "tags" {
