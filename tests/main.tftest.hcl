@@ -16,6 +16,8 @@ provider "aws" {
 
 variables {
   observability_platform_account_id = "111111111111"
+  grafana_athena_query_results_s3_bucket = "query_results_s3_bucket"
+  cost_usage_reports_s3_bucket = "cost_usage_reports_s3_bucket"
 }
 
 run "main" {
