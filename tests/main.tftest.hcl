@@ -11,35 +11,20 @@ provider "aws" {
 
   endpoints {
     iam = "http://127.0.0.1:4566"
+    sts = "http://127.0.0.1:4566"
   }
-}
-
-variables {
-  observability_platform_account_id = "111111111111"
 }
 
 run "main" {
   command = apply
 }
 
-run "invalid_account_id" {
+run "attach_amazon_prometheus_query_access" {
   command = plan
 
   variables {
-    observability_platform_account_id = "1234567890"
+    enable_amazon_prometheus_query_access = true
   }
-
-  expect_failures = [var.observability_platform_account_id]
-}
-
-run "invalid_role_name" {
-  command = plan
-
-  variables {
-    role_name = "bad-role-name"
-  }
-
-  expect_failures = [var.role_name]
 }
 
 run "additional_policies" {

@@ -1,5 +1,5 @@
 {
-    "name": "terraform-aws-observability-platform-tenant",
+    "name": "terraform-aws-analytical-platform-observability",
     "image": "ghcr.io/ministryofjustice/devcontainer-base:latest",
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:2": {},

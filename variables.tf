@@ -1,37 +1,24 @@
-variable "role_name" {
-  type        = string
-  description = "Name of the role to create, This is set as a variable but Observability Platform requires this to be set to 'observability-platform'"
-  default     = "observability-platform"
-  validation {
-    condition     = var.role_name == "observability-platform"
-    error_message = "Role name must be set to 'observability-platform'"
-  }
-}
-
-variable "observability_platform_account_id" {
-  type        = string
-  description = "Account ID of the Observability Platform environment. If you are running on Modernisation Platform you can use 'local.environment_management.account_ids[\"observability-platform-production\"]'"
-  validation {
-    condition     = length(var.observability_platform_account_id) == 12
-    error_message = "Account ID must be a 12-digit number (https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-identifiers.html)"
-  }
-}
-
-variable "enable_prometheus" {
+variable "enable_cloudwatch_read_only_access" {
   type        = bool
-  description = "Enable AWS Managed Prometheus' query access managed policy"
+  description = "Enable CloudWatchReadOnlyAccess managed policy"
+  default     = true
+}
+
+variable "enable_amazon_prometheus_query_access" {
+  type        = bool
+  description = "Enable AmazonPrometheusQueryAccess managed policy"
   default     = false
 }
 
-variable "enable_xray" {
+variable "enable_aws_xray_read_only_access" {
   type        = bool
-  description = "Enable AWS X-Ray's read only managed policy"
+  description = "Enable AWSXrayReadOnlyAccess managed policy"
   default     = false
 }
 
 variable "additional_policies" {
   type        = map(string)
-  description = "ARNs of any policies to attach to the IAM role"
+  description = "ARNs of any additional policies to attach to the IAM role"
   default     = {}
 }
 

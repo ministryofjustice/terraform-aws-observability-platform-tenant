@@ -2,7 +2,7 @@
 services:
   localstack:
     container_name: "localstack"
-    image: docker.io/localstack/localstack@sha256:97ccc65daec3542bd2cb3160d7355f11e89ad8027fd3c834b9d1197d197d866f # v4.1.1
+    image: docker.io/localstack/localstack:4.3.0@sha256:f3cb1a79f3add997575e859c3a2808e6dae4b0de836661de255baa2b576868f8
     ports:
       - "127.0.0.1:4566:4566" # LocalStack Gateway
       - "127.0.0.1:4510-4559:4510-4559" # external services port range
