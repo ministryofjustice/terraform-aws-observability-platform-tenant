@@ -1,2 +1,2 @@
-awscli-local==0.22.1
+awscli-local==0.22.2
 terraform-local==0.24.1
