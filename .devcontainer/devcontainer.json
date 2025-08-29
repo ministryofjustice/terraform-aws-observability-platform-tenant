@@ -2,7 +2,7 @@
     "name": "terraform-aws-observability-platform-tenant",
     "image": "ghcr.io/ministryofjustice/devcontainer-base:latest",
     "features": {
-      "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+      "ghcr.io/devcontainers/features/docker-in-docker:": {},
       "ghcr.io/ministryofjustice/devcontainer-feature/aws:1": {},
       "ghcr.io/ministryofjustice/devcontainer-feature/terraform:1": {}
     },
