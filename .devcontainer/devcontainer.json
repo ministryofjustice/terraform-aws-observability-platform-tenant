@@ -9,11 +9,11 @@
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
 	"customizations": {
 		"vscode": {
-		"extensions": [
-			"EditorConfig.EditorConfig",
-			"GitHub.vscode-github-actions",
-			"GitHub.vscode-pull-request-github"
-		]
+			"extensions": [
+				"EditorConfig.EditorConfig",
+				"GitHub.vscode-github-actions",
+				"GitHub.vscode-pull-request-github"
+			]
 		}
 	}
 }
