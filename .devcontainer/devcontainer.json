@@ -2,18 +2,18 @@
     "name": "terraform-aws-observability-platform-tenant",
     "image": "ghcr.io/ministryofjustice/devcontainer-base:latest",
     "features": {
-      "ghcr.io/devcontainers/features/docker-in-docker:": {},
-      "ghcr.io/ministryofjustice/devcontainer-feature/aws:1": {},
-      "ghcr.io/ministryofjustice/devcontainer-feature/terraform:1": {}
+        "ghcr.io/devcontainers/features/docker-in-docker:": {},
+        "ghcr.io/ministryofjustice/devcontainer-feature/aws:1": {},
+        "ghcr.io/ministryofjustice/devcontainer-feature/terraform:1": {}
     },
     "postCreateCommand": "bash .devcontainer/post-create.sh",
     "customizations": {
-      "vscode": {
-        "extensions": [
-          "EditorConfig.EditorConfig",
-          "GitHub.vscode-github-actions",
-          "GitHub.vscode-pull-request-github"
-        ]
-      }
+        "vscode": {
+            "extensions": [
+                "EditorConfig.EditorConfig",
+                "GitHub.vscode-github-actions",
+                "GitHub.vscode-pull-request-github"
+            ]
+        }
     }
-  }
+}
