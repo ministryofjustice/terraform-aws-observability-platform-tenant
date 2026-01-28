@@ -35,6 +35,24 @@ variable "additional_policies" {
   default     = {}
 }
 
+variable "enable_health_signal_reader_role" {
+  type        = bool
+  default     = false
+  description = "Create a role in the tenant account that Observability Platform can assume to read inputs for generating health signals."
+}
+
+variable "observability_platform_health_signal_assumer_arns" {
+  type        = list(string)
+  default     = []
+  description = "List of IAM role ARNs (in Observability Platform accounts) that can assume the tenant health-signal reader role."
+}
+
+variable "health_signal_reader_role_name" {
+  type        = string
+  default     = "observability-platform-health-signal-reader"
+  description = "Name of the tenant role that Observability Platform assumes to read health signal inputs."
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags to apply to resources"
