@@ -46,7 +46,39 @@ data "aws_iam_policy_document" "health_signal_reader_policy" {
     ]
     resources = ["*"]
   }
+
+  # NAT gateway discovery (used by NAT error + telemetry freshness checks)
+  statement {
+    sid     = "EC2DescribeForNatSignals"
+    effect  = "Allow"
+    actions = [
+      "ec2:DescribeNatGateways"
+    ]
+    resources = ["*"]
+  }
+
+  # Load balancer discovery (used by ALB 5xx + telemetry freshness checks)
+  statement {
+    sid     = "ELBv2DescribeForEdgeSignals"
+    effect  = "Allow"
+    actions = [
+      "elasticloadbalancing:DescribeLoadBalancers"
+    ]
+    resources = ["*"]
+  }
+
+  # Quota + usage checks (EIP/VPC usage ratio)
+  statement {
+    sid     = "QuotaSignals"
+    effect  = "Allow"
+    actions = [
+      "servicequotas:GetServiceQuota",
+      "ec2:DescribeAddresses"
+    ]
+    resources = ["*"]
+  }
 }
+
 
 resource "aws_iam_role_policy" "health_signal_reader" {
   count = var.enable_health_signal_reader_role ? 1 : 0
