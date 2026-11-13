@@ -51,3 +51,85 @@ run "additional_policies" {
     }
   }
 }
+
+run "grafana_cloud_disabled_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(module.grafana_cloud) == 0
+    error_message = "Grafana Cloud resources should not be created unless grafana_cloud is set"
+  }
+}
+
+run "grafana_cloud_cloudwatch_only" {
+  command = plan
+
+  variables {
+    grafana_cloud = {
+      stack_id = "1234567"
+    }
+  }
+
+  assert {
+    condition     = length(module.grafana_cloud) == 1
+    error_message = "Grafana Cloud resources should be created when grafana_cloud is set"
+  }
+}
+
+run "grafana_cloud_pdc_agent" {
+  command = plan
+
+  variables {
+    grafana_cloud = {
+      stack_id = "1234567"
+      features = {
+        pdc_agent = true
+      }
+      pdc_agent = {
+        cluster_name      = "placeholder-pdc-network"
+        token_secret_arn  = "placeholder-secret-arn"
+        token_kms_key_arn = "placeholder-kms-key-arn"
+        vpc_id            = "placeholder-vpc-id"
+        subnet_ids        = ["placeholder-subnet-a", "placeholder-subnet-b"]
+      }
+    }
+  }
+}
+
+run "pdc_agent_requires_settings" {
+  command = plan
+
+  variables {
+    grafana_cloud = {
+      stack_id = "1234567"
+      features = {
+        pdc_agent = true
+      }
+    }
+  }
+
+  expect_failures = [var.grafana_cloud]
+}
+
+run "pdc_agent_needs_two_tasks" {
+  command = plan
+
+  variables {
+    grafana_cloud = {
+      stack_id = "1234567"
+      features = {
+        pdc_agent = true
+      }
+      pdc_agent = {
+        cluster_name      = "placeholder-pdc-network"
+        token_secret_arn  = "placeholder-secret-arn"
+        token_kms_key_arn = "placeholder-kms-key-arn"
+        vpc_id            = "placeholder-vpc-id"
+        subnet_ids        = ["placeholder-subnet-a"]
+        desired_count     = 1
+      }
+    }
+  }
+
+  expect_failures = [var.grafana_cloud]
+}
