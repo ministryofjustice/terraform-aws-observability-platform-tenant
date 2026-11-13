@@ -1,43 +1,48 @@
-data "aws_iam_policy_document" "assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${var.observability_platform_account_id}:root"]
-    }
-  }
+module "amazon_managed_grafana" {
+  source = "./modules/amazon-managed-grafana"
+
+  role_name                         = var.role_name
+  observability_platform_account_id = var.observability_platform_account_id
+  enable_prometheus                 = var.enable_prometheus
+  enable_xray                       = var.enable_xray
+  additional_policies               = var.additional_policies
+  tags                              = var.tags
 }
 
-resource "aws_iam_role" "this" {
-  name               = var.role_name
-  path               = "/"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
+module "grafana_cloud" {
+  count  = var.grafana_cloud == null ? 0 : 1
+  source = "./modules/grafana-cloud"
 
-  tags = var.tags
+  stack_id            = var.grafana_cloud.stack_id
+  aws_account_id      = var.grafana_cloud.aws_account_id
+  features            = var.grafana_cloud.features
+  additional_policies = var.grafana_cloud.additional_policies
+  pdc_agent           = var.grafana_cloud.pdc_agent
+  tags                = var.tags
 }
 
-resource "aws_iam_role_policy_attachment" "cloudwatch_readonly_access" {
-  role       = aws_iam_role.this.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+# Resources moved into the Amazon Managed Grafana submodule in 3.0.0, so upgrading does not recreate the role.
+moved {
+  from = aws_iam_role.this
+  to   = module.amazon_managed_grafana.aws_iam_role.this
 }
 
-resource "aws_iam_role_policy_attachment" "amazon_prometheus_query_access" {
-  count = var.enable_prometheus ? 1 : 0
-
-  role       = aws_iam_role.this.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonPrometheusQueryAccess"
+moved {
+  from = aws_iam_role_policy_attachment.cloudwatch_readonly_access
+  to   = module.amazon_managed_grafana.aws_iam_role_policy_attachment.cloudwatch_readonly_access
 }
 
-resource "aws_iam_role_policy_attachment" "xray_readonly_access" {
-  count = var.enable_xray ? 1 : 0
-
-  role       = aws_iam_role.this.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess"
+moved {
+  from = aws_iam_role_policy_attachment.amazon_prometheus_query_access
+  to   = module.amazon_managed_grafana.aws_iam_role_policy_attachment.amazon_prometheus_query_access
 }
 
-resource "aws_iam_role_policy_attachment" "additional_policies" {
-  for_each = { for k, v in var.additional_policies : k => v }
+moved {
+  from = aws_iam_role_policy_attachment.xray_readonly_access
+  to   = module.amazon_managed_grafana.aws_iam_role_policy_attachment.xray_readonly_access
+}
 
-  role       = aws_iam_role.this.name
-  policy_arn = each.value
+moved {
+  from = aws_iam_role_policy_attachment.additional_policies
+  to   = module.amazon_managed_grafana.aws_iam_role_policy_attachment.additional_policies
 }
