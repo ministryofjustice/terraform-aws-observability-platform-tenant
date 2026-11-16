@@ -64,8 +64,7 @@ run "pdc_agent" {
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled          = true
-        token_secret_arn = "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/example-AbCdEf"
+        enabled = true
       }
     }
   }
@@ -95,8 +94,7 @@ run "pdc_agent_requires_grafana_cloud" {
     grafana_cloud = {
       enabled = false
       pdc_agent = {
-        enabled          = true
-        token_secret_arn = "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/example-AbCdEf"
+        enabled = true
       }
     }
   }
@@ -104,13 +102,14 @@ run "pdc_agent_requires_grafana_cloud" {
   expect_failures = [var.grafana_cloud]
 }
 
-run "pdc_agent_requires_token_secret" {
+run "pdc_agent_invalid_token_secret_arn" {
   command = plan
 
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled = true
+        enabled          = true
+        token_secret_arn = "grafana-cloud/pdc/111111111111"
       }
     }
   }
@@ -124,9 +123,8 @@ run "pdc_agent_needs_two_tasks" {
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled          = true
-        token_secret_arn = "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/example-AbCdEf"
-        desired_count    = 1
+        enabled       = true
+        desired_count = 1
       }
     }
   }
@@ -140,9 +138,8 @@ run "pdc_agent_invalid_allowed_target" {
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled          = true
-        token_secret_arn = "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/example-AbCdEf"
-        allowed_targets  = [{ cidr_block = "10.0.0.0/16", port = 0 }]
+        enabled         = true
+        allowed_targets = [{ cidr_block = "10.0.0.0/16", port = 0 }]
       }
     }
   }

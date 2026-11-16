@@ -13,7 +13,8 @@ module "grafana_cloud" {
   count  = var.grafana_cloud.enabled ? 1 : 0
   source = "./modules/grafana-cloud"
 
-  stack = var.grafana_cloud.stack
+  stack                             = var.grafana_cloud.stack
+  observability_platform_account_id = var.observability_platform_account_id
   # Shared policies give data sources the same access in Grafana Cloud as in Amazon Managed Grafana
   additional_policies = merge(var.additional_policies, var.grafana_cloud.additional_policies)
   pdc_agent           = var.grafana_cloud.pdc_agent

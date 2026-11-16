@@ -23,13 +23,20 @@ mock_provider "aws" {
       vpc_id = "vpc-0123456789abcdef0"
     }
   }
+
+  mock_data "aws_caller_identity" {
+    defaults = {
+      account_id = "111111111111"
+    }
+  }
 }
 
 variables {
-  stack = "development"
+  stack                             = "development"
+  observability_platform_account_id = "222222222222"
   pdc_agent = {
     enabled            = true
-    token_secret_arn   = "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/example-AbCdEf"
+    token_secret_arn   = null
     subnet_ids         = null
     allowed_targets    = []
     desired_count      = 3
@@ -74,10 +81,45 @@ run "pdc_agent_development_stack" {
 
   assert {
     condition = (
+      jsondecode(aws_ecs_task_definition.pdc_agent[0].container_definitions)[0].secrets[0].valueFrom == "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/111111111111" &&
+      jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[0].Resource == [
+        "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/111111111111",
+        "arn:aws:secretsmanager:eu-west-2:222222222222:secret:grafana-cloud/pdc/111111111111-??????",
+      ]
+    )
+    error_message = "The PDC agent should read the token from the secret Observability Platform creates for the account, whatever its suffix"
+  }
+
+  assert {
+    condition = (
       jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[1].Resource == ["arn:aws:kms:eu-west-2:222222222222:key/*"] &&
       jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[1].Condition.StringEquals["kms:ViaService"] == "secretsmanager.eu-west-2.amazonaws.com"
     )
     error_message = "The PDC agent should only decrypt the token through Secrets Manager, with keys in the secret's account and region"
+  }
+}
+
+run "pdc_agent_token_secret_override" {
+  command = apply
+
+  module {
+    source = "./modules/grafana-cloud"
+  }
+
+  variables {
+    pdc_agent = merge(var.pdc_agent, {
+      token_secret_arn = "arn:aws:secretsmanager:eu-west-1:333333333333:secret:example-AbCdEf"
+    })
+  }
+
+  assert {
+    condition = (
+      jsondecode(aws_ecs_task_definition.pdc_agent[0].container_definitions)[0].secrets[0].valueFrom == "arn:aws:secretsmanager:eu-west-1:333333333333:secret:example-AbCdEf" &&
+      jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[0].Resource[0] == "arn:aws:secretsmanager:eu-west-1:333333333333:secret:example-AbCdEf" &&
+      jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[1].Resource == ["arn:aws:kms:eu-west-1:333333333333:key/*"] &&
+      jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[1].Condition.StringEquals["kms:ViaService"] == "secretsmanager.eu-west-1.amazonaws.com"
+    )
+    error_message = "The PDC agent should read the given token secret, and decrypt it with keys in that secret's account and region"
   }
 }
 

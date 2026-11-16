@@ -71,7 +71,7 @@ variable "grafana_cloud" {
     - additional_policies: ARNs of policies to attach to the 'grafana-cloud' role only.
     - pdc_agent: a Private Data Source Connect agent, needed only to query data sources inside the VPC.
       - enabled: run the agent on ECS Fargate.
-      - token_secret_arn: ARN of the agent's token secret in Observability Platform. Required when the agent is enabled.
+      - token_secret_arn: full ARN of the agent's token secret. Defaults to the secret Observability Platform creates for this account, grafana-cloud/pdc/<account ID>.
       - subnet_ids: subnets to run the agent in. Defaults to the Modernisation Platform general private subnets.
       - allowed_targets: CIDR blocks and TCP ports of the data sources the agent may connect to.
       - desired_count: number of agent tasks, at least 2.
@@ -89,8 +89,8 @@ variable "grafana_cloud" {
     error_message = "grafana_cloud.pdc_agent.enabled requires grafana_cloud.enabled"
   }
   validation {
-    condition     = !var.grafana_cloud.pdc_agent.enabled || can(regex("^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$", var.grafana_cloud.pdc_agent.token_secret_arn))
-    error_message = "grafana_cloud.pdc_agent.token_secret_arn must be the ARN of the PDC token secret when the PDC agent is enabled"
+    condition     = var.grafana_cloud.pdc_agent.token_secret_arn == null || can(regex("^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$", var.grafana_cloud.pdc_agent.token_secret_arn))
+    error_message = "grafana_cloud.pdc_agent.token_secret_arn must be the ARN of a Secrets Manager secret"
   }
   validation {
     condition     = var.grafana_cloud.pdc_agent.desired_count >= 2

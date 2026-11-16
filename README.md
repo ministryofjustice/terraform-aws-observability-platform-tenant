@@ -36,8 +36,8 @@ The role trusts Observability Platform's production stack. To try the developmen
 
 To query data sources that are only reachable inside your VPC, such as OpenSearch or a database, run the PDC agent:
 
-1. Set `pdc_enabled = true` for the account in the Grafana Cloud tenant configuration. Observability Platform creates a PDC token secret that the agent can read, and gives you its ARN.
-1. Enable the agent with the token secret's ARN, and the data sources it may connect to:
+1. Set `pdc_enabled = true` for the account in the Grafana Cloud tenant configuration. Observability Platform creates a PDC token for the account, in a secret named `grafana-cloud/pdc/<account ID>` that only the agent can read.
+1. Enable the agent, with the data sources it may connect to:
 
    ```hcl
    module "observability_platform_tenant" {
@@ -48,8 +48,7 @@ To query data sources that are only reachable inside your VPC, such as OpenSearc
 
      grafana_cloud = {
        pdc_agent = {
-         enabled          = true
-         token_secret_arn = "arn:aws:secretsmanager:eu-west-2:<observability platform account ID>:secret:grafana-cloud/pdc/<tenant>-<suffix>"
+         enabled = true
          allowed_targets = [
            { cidr_block = "10.26.0.0/21", port = 443 },
          ]
@@ -61,6 +60,12 @@ To query data sources that are only reachable inside your VPC, such as OpenSearc
    ```
 
 1. Allow the agent's security group, output as `grafana_cloud_pdc_agent_security_group_id`, into each data source's security group.
+
+The agent reads its token from the secret in the `observability_platform_account_id` account. If the agent is deployed before the secret exists, its tasks fail to start and ECS stops retrying them, so once Observability Platform has created the secret, run:
+
+```bash
+aws ecs update-service --cluster grafana-pdc-agent --service grafana-pdc-agent --force-new-deployment
+```
 
 By default the agent runs three tasks in the Modernisation Platform `general-private` subnets. Outside Modernisation Platform, set `subnet_ids`.
 
@@ -76,7 +81,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `observability_platform_account_id` | Account ID of the Observability Platform environment that Amazon Managed Grafana runs in | Required |
+| `observability_platform_account_id` | Account ID of the Observability Platform environment that Amazon Managed Grafana runs in, and that holds the PDC agent's token | Required |
 | `role_name` | Name of the Amazon Managed Grafana role, which must be `observability-platform` | `"observability-platform"` |
 | `enable_prometheus` | Attach AmazonPrometheusQueryAccess to the Amazon Managed Grafana role | `false` |
 | `enable_xray` | Attach AWSXrayReadOnlyAccess to the Amazon Managed Grafana role | `false` |
@@ -90,7 +95,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 | `stack` | Observability Platform stack trusted to assume the role, and that the PDC agent connects to: `development` or `production` | `"production"` |
 | `additional_policies` | ARNs of policies to attach to the `grafana-cloud` role only | `{}` |
 | `pdc_agent.enabled` | Run the PDC agent | `false` |
-| `pdc_agent.token_secret_arn` | ARN of the agent's token secret in Observability Platform. Required when the agent is enabled | |
+| `pdc_agent.token_secret_arn` | Full ARN of the agent's token secret, to use a different secret | `grafana-cloud/pdc/<account ID>` in Observability Platform |
 | `pdc_agent.subnet_ids` | Private subnets to run the agent in | Modernisation Platform `general-private` subnets |
 | `pdc_agent.allowed_targets` | CIDR blocks and TCP ports of data sources the agent may connect to | `[]` |
 | `pdc_agent.desired_count` | Number of agent tasks, at least 2 | `3` |

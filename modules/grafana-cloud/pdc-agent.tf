@@ -1,6 +1,6 @@
 # Private Data Source Connect (PDC) agent, run on ECS Fargate.
 #
-# The signing token is held in a Secrets Manager secret in the Observability Platform account,
+# Observability Platform keeps the signing token in a Secrets Manager secret named grafana-cloud/pdc/<this account's ID>,
 # encrypted with a customer managed KMS key. Both the secret policy and key policy there only trust a role
 # named "grafana-pdc-agent-execution", so that name must not change.
 
@@ -10,8 +10,15 @@ locals {
 
   pdc_agent_subnet_ids = var.pdc_agent.subnet_ids != null ? var.pdc_agent.subnet_ids : flatten(data.aws_subnets.pdc_agent[*].ids)
 
+  # Secrets Manager adds a random suffix to the secret's ARN, so by default this is a partial ARN without it,
+  # which Secrets Manager resolves
+  pdc_agent_token_secret_arn = local.pdc_agent_enabled ? coalesce(
+    var.pdc_agent.token_secret_arn,
+    "arn:aws:secretsmanager:${local.observability_platform_region}:${var.observability_platform_account_id}:secret:grafana-cloud/pdc/${data.aws_caller_identity.current[0].account_id}",
+  ) : null
+
   # Region and account of the token secret and its KMS key: arn:aws:secretsmanager:<region>:<account>:secret:<name>
-  pdc_agent_token_secret_arn_parts = local.pdc_agent_enabled ? split(":", var.pdc_agent.token_secret_arn) : []
+  pdc_agent_token_secret_arn_parts = local.pdc_agent_enabled ? split(":", local.pdc_agent_token_secret_arn) : []
 
   # Grafana Cloud PDC API and AWS APIs on 443, and the PDC gateway SSH tunnel on 22, plus the private data sources
   pdc_agent_egress_rules = local.pdc_agent_enabled ? {
@@ -23,6 +30,10 @@ locals {
 }
 
 data "aws_region" "current" {
+  count = local.pdc_agent_enabled ? 1 : 0
+}
+
+data "aws_caller_identity" "current" {
   count = local.pdc_agent_enabled ? 1 : 0
 }
 
@@ -82,9 +93,10 @@ resource "aws_iam_role_policy" "pdc_agent_token" {
     Version = "2012-10-17"
     Statement = [
       {
+        # IAM matches the secret's full ARN, which has a six-character suffix that a partial ARN lacks
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [var.pdc_agent.token_secret_arn]
+        Resource = [local.pdc_agent_token_secret_arn, "${local.pdc_agent_token_secret_arn}-??????"]
       },
       {
         # Any key in the secret's account, but only when Secrets Manager uses it to decrypt a secret
@@ -168,7 +180,7 @@ resource "aws_ecs_task_definition" "pdc_agent" {
     ], var.pdc_agent.extra_args)
     secrets = [{
       name      = "GCLOUD_PDC_SIGNING_TOKEN"
-      valueFrom = var.pdc_agent.token_secret_arn
+      valueFrom = local.pdc_agent_token_secret_arn
     }]
     # The agent creates its SSH keys and known hosts under $HOME/.ssh when it starts
     readonlyRootFilesystem = false

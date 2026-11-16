@@ -3,6 +3,11 @@ variable "stack" {
   description = "Observability Platform Grafana Cloud stack trusted to assume the role and that the PDC agent connects to: 'development' or 'production'"
 }
 
+variable "observability_platform_account_id" {
+  type        = string
+  description = "Account ID of the Observability Platform environment, which holds the PDC agent's token"
+}
+
 variable "additional_policies" {
   type        = map(string)
   description = "ARNs of any policies to attach to the Grafana Cloud role"

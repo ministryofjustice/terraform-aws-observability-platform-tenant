@@ -15,4 +15,7 @@ locals {
   }
 
   stack = local.stacks[var.stack]
+
+  # Observability Platform's region, where it keeps each account's PDC agent token
+  observability_platform_region = "eu-west-2"
 }
