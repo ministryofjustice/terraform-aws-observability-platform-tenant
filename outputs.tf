@@ -12,3 +12,8 @@ output "grafana_cloud_pdc_agent_execution_role_arn" {
   description = "ARN of the PDC agent execution role, or null if the PDC agent is not enabled"
   value       = one(module.grafana_cloud[*].pdc_agent_execution_role_arn)
 }
+
+output "grafana_cloud_pdc_agent_security_group_id" {
+  description = "ID of the PDC agent security group, to allow it into data sources' security groups, or null if the PDC agent is not enabled"
+  value       = one(module.grafana_cloud[*].pdc_agent_security_group_id)
+}

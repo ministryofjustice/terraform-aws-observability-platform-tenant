@@ -3,12 +3,14 @@ data "aws_iam_policy_document" "assume" {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${var.aws_account_id}:root"]
+      identifiers = ["arn:aws:iam::${local.grafana_cloud_aws_account_id}:root"]
     }
+    # Grafana Assume Role's shared external ID is the stack ID, so only our stack can assume the role.
+    # Data sources with a unique per-data-source external ID can't assume it.
     condition {
       test     = "StringEquals"
       variable = "sts:ExternalId"
-      values   = [var.stack_id]
+      values   = [local.stack.id]
     }
   }
 }
@@ -22,22 +24,16 @@ resource "aws_iam_role" "this" {
 }
 
 resource "aws_iam_role_policy_attachment" "cloudwatch_readonly_access" {
-  count = var.features.cloudwatch ? 1 : 0
-
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "amazon_prometheus_query_access" {
-  count = var.features.prometheus ? 1 : 0
-
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonPrometheusQueryAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "xray_readonly_access" {
-  count = var.features.xray ? 1 : 0
-
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess"
 }

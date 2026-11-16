@@ -33,7 +33,7 @@ variable "enable_xray" {
 
 variable "additional_policies" {
   type        = map(string)
-  description = "ARNs of any policies to attach to the Amazon Managed Grafana role"
+  description = "ARNs of any policies to attach to the Amazon Managed Grafana role. They are also attached to the Grafana Cloud role, so data sources keep working when they move to Grafana Cloud"
   default     = {}
 }
 
@@ -41,52 +41,75 @@ variable "additional_policies" {
 
 variable "grafana_cloud" {
   type = object({
-    stack_id            = string
-    aws_account_id      = optional(string, "008923505280")
+    enabled             = optional(bool, true)
+    stack               = optional(string, "production")
     additional_policies = optional(map(string), {})
-    features = optional(object({
-      cloudwatch = optional(bool, true)
-      prometheus = optional(bool, false)
-      xray       = optional(bool, false)
-      pdc_agent  = optional(bool, false)
-    }), {})
     pdc_agent = optional(object({
-      cluster_name       = string
-      token_secret_arn   = string
-      token_kms_key_arn  = string
-      vpc_id             = string
-      subnet_ids         = list(string)
-      desired_count      = optional(number, 2)
-      cpu                = optional(number, 256)
-      memory             = optional(number, 512)
-      image              = optional(string, "docker.io/grafana/pdc-agent:0.0.67")
+      enabled          = optional(bool, false)
+      token_secret_arn = optional(string)
+      subnet_ids       = optional(list(string))
+      allowed_targets = optional(list(object({
+        cidr_block = string
+        port       = number
+      })), [])
+      desired_count = optional(number, 3)
+      cpu           = optional(number, 256)
+      memory        = optional(number, 512)
+      # grafana/pdc-agent 0.0.69
+      image              = optional(string, "docker.io/grafana/pdc-agent@sha256:32332a5d4605598d091ecaec7f977c2aecf3bdb89fb424328b3062f6c5d40561")
       extra_args         = optional(list(string), [])
       log_retention_days = optional(number, 365)
       alarm_actions      = optional(list(string), [])
       egress_cidr_blocks = optional(list(string), ["0.0.0.0/0"])
-    }))
+    }), {})
   })
   description = <<-EOT
-    Enables Grafana Cloud connectivity. Leave as null to deploy only the Amazon Managed Grafana role.
+    Grafana Cloud settings. The defaults create the 'grafana-cloud' role for the production stack, and no PDC agent.
 
-    - stack_id: the Grafana Cloud stack ID, used as the external ID on the role and as the PDC hosted Grafana ID.
-    - aws_account_id: Grafana Cloud's AWS account that is trusted to assume the role.
-    - features: which capabilities to enable. 'pdc_agent' requires 'pdc_agent' settings.
-    - pdc_agent: where and how to run the Private Data Source Connect agent. The token secret and KMS key live in the Observability Platform account.
+    - enabled: create the 'grafana-cloud' role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus.
+    - stack: the Observability Platform stack trusted to assume the role, 'development' or 'production'.
+    - additional_policies: ARNs of policies to attach to the 'grafana-cloud' role only.
+    - pdc_agent: a Private Data Source Connect agent, needed only to query data sources inside the VPC.
+      - enabled: run the agent on ECS Fargate.
+      - token_secret_arn: ARN of the agent's token secret in Observability Platform. Required when the agent is enabled.
+      - subnet_ids: subnets to run the agent in. Defaults to the Modernisation Platform general private subnets.
+      - allowed_targets: CIDR blocks and TCP ports of the data sources the agent may connect to.
+      - desired_count: number of agent tasks, at least 2.
+      - egress_cidr_blocks: CIDR blocks the agent may reach on ports 22 and 443, for Grafana Cloud and AWS APIs.
   EOT
-  default     = null
+  default     = {}
+  nullable    = false
 
   validation {
-    condition     = var.grafana_cloud == null ? true : can(regex("^[0-9]+$", var.grafana_cloud.stack_id))
-    error_message = "grafana_cloud.stack_id must be the numeric Grafana Cloud stack ID"
+    condition     = contains(["development", "production"], var.grafana_cloud.stack)
+    error_message = "grafana_cloud.stack must be 'development' or 'production'"
   }
   validation {
-    condition     = var.grafana_cloud == null ? true : (var.grafana_cloud.features.pdc_agent == (var.grafana_cloud.pdc_agent != null))
-    error_message = "Set grafana_cloud.pdc_agent if, and only if, grafana_cloud.features.pdc_agent is true"
+    condition     = var.grafana_cloud.enabled || !var.grafana_cloud.pdc_agent.enabled
+    error_message = "grafana_cloud.pdc_agent.enabled requires grafana_cloud.enabled"
   }
   validation {
-    condition     = var.grafana_cloud == null ? true : (var.grafana_cloud.pdc_agent == null ? true : var.grafana_cloud.pdc_agent.desired_count >= 2)
-    error_message = "grafana_cloud.pdc_agent.desired_count must be at least 2 so rolling restarts do not drop connectivity"
+    condition     = !var.grafana_cloud.pdc_agent.enabled || can(regex("^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$", var.grafana_cloud.pdc_agent.token_secret_arn))
+    error_message = "grafana_cloud.pdc_agent.token_secret_arn must be the ARN of the PDC token secret when the PDC agent is enabled"
+  }
+  validation {
+    condition     = var.grafana_cloud.pdc_agent.desired_count >= 2
+    error_message = "grafana_cloud.pdc_agent.desired_count must be at least 2 so the agent stays connected while a task is replaced"
+  }
+  validation {
+    condition     = var.grafana_cloud.pdc_agent.subnet_ids == null ? true : length(var.grafana_cloud.pdc_agent.subnet_ids) > 0
+    error_message = "grafana_cloud.pdc_agent.subnet_ids must not be empty. Leave it unset to use the Modernisation Platform general private subnets"
+  }
+  validation {
+    condition = alltrue([
+      for target in var.grafana_cloud.pdc_agent.allowed_targets :
+      can(cidrnetmask(target.cidr_block)) && target.port >= 1 && target.port <= 65535 && floor(target.port) == target.port
+    ])
+    error_message = "Each grafana_cloud.pdc_agent.allowed_targets entry needs an IPv4 CIDR block and a TCP port from 1 to 65535"
+  }
+  validation {
+    condition     = alltrue([for cidr_block in var.grafana_cloud.pdc_agent.egress_cidr_blocks : can(cidrnetmask(cidr_block))])
+    error_message = "grafana_cloud.pdc_agent.egress_cidr_blocks must be IPv4 CIDR blocks"
   }
 }
 

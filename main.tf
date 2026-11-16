@@ -10,18 +10,17 @@ module "amazon_managed_grafana" {
 }
 
 module "grafana_cloud" {
-  count  = var.grafana_cloud == null ? 0 : 1
+  count  = var.grafana_cloud.enabled ? 1 : 0
   source = "./modules/grafana-cloud"
 
-  stack_id            = var.grafana_cloud.stack_id
-  aws_account_id      = var.grafana_cloud.aws_account_id
-  features            = var.grafana_cloud.features
-  additional_policies = var.grafana_cloud.additional_policies
+  stack = var.grafana_cloud.stack
+  # Shared policies give data sources the same access in Grafana Cloud as in Amazon Managed Grafana
+  additional_policies = merge(var.additional_policies, var.grafana_cloud.additional_policies)
   pdc_agent           = var.grafana_cloud.pdc_agent
   tags                = var.tags
 }
 
-# Resources moved into the Amazon Managed Grafana submodule in 3.0.0, so upgrading does not recreate the role.
+# Resources moved into the Amazon Managed Grafana submodule in 2.1.0, so upgrading does not recreate the role.
 moved {
   from = aws_iam_role.this
   to   = module.amazon_managed_grafana.aws_iam_role.this

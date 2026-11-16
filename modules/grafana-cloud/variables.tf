@@ -1,21 +1,6 @@
-variable "stack_id" {
+variable "stack" {
   type        = string
-  description = "Grafana Cloud stack ID. Used as the external ID on the role and as the PDC hosted Grafana ID"
-}
-
-variable "aws_account_id" {
-  type        = string
-  description = "Grafana Cloud's AWS account, trusted to assume the role"
-}
-
-variable "features" {
-  type = object({
-    cloudwatch = bool
-    prometheus = bool
-    xray       = bool
-    pdc_agent  = bool
-  })
-  description = "Capabilities to enable"
+  description = "Observability Platform Grafana Cloud stack trusted to assume the role and that the PDC agent connects to: 'development' or 'production'"
 }
 
 variable "additional_policies" {
@@ -26,11 +11,13 @@ variable "additional_policies" {
 
 variable "pdc_agent" {
   type = object({
-    cluster_name       = string
-    token_secret_arn   = string
-    token_kms_key_arn  = string
-    vpc_id             = string
-    subnet_ids         = list(string)
+    enabled          = bool
+    token_secret_arn = string
+    subnet_ids       = list(string)
+    allowed_targets = list(object({
+      cidr_block = string
+      port       = number
+    }))
     desired_count      = number
     cpu                = number
     memory             = number
@@ -40,8 +27,7 @@ variable "pdc_agent" {
     alarm_actions      = list(string)
     egress_cidr_blocks = list(string)
   })
-  description = "Private Data Source Connect agent settings. Required when features.pdc_agent is true"
-  default     = null
+  description = "Private Data Source Connect agent settings. Defaults are set by the root module"
 }
 
 variable "tags" {

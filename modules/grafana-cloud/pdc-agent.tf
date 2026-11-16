@@ -5,11 +5,49 @@
 # named "grafana-pdc-agent-execution", so that name must not change.
 
 locals {
-  pdc_agent_enabled = var.features.pdc_agent
+  pdc_agent_enabled = var.pdc_agent.enabled
   pdc_agent_name    = "grafana-pdc-agent"
+
+  pdc_agent_subnet_ids = var.pdc_agent.subnet_ids != null ? var.pdc_agent.subnet_ids : flatten(data.aws_subnets.pdc_agent[*].ids)
+
+  # Region and account of the token secret and its KMS key: arn:aws:secretsmanager:<region>:<account>:secret:<name>
+  pdc_agent_token_secret_arn_parts = local.pdc_agent_enabled ? split(":", var.pdc_agent.token_secret_arn) : []
+
+  # Grafana Cloud PDC API and AWS APIs on 443, and the PDC gateway SSH tunnel on 22, plus the private data sources
+  pdc_agent_egress_rules = local.pdc_agent_enabled ? {
+    for rule in distinct(concat(
+      [for pair in setproduct(var.pdc_agent.egress_cidr_blocks, [22, 443]) : { cidr_block = pair[0], port = pair[1] }],
+      var.pdc_agent.allowed_targets,
+    )) : "${rule.cidr_block}-${rule.port}" => rule
+  } : {}
 }
 
-data "aws_region" "current" {}
+data "aws_region" "current" {
+  count = local.pdc_agent_enabled ? 1 : 0
+}
+
+# Modernisation Platform shares subnets named <business unit>-<environment>-general-private-<availability zone>
+data "aws_subnets" "pdc_agent" {
+  count = local.pdc_agent_enabled && var.pdc_agent.subnet_ids == null ? 1 : 0
+
+  filter {
+    name   = "tag:Name"
+    values = ["*-general-private-*"]
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = length(self.ids) > 0
+      error_message = "No Modernisation Platform general private subnets were found. Set grafana_cloud.pdc_agent.subnet_ids to the private subnets the PDC agent should run in."
+    }
+  }
+}
+
+data "aws_subnet" "pdc_agent" {
+  count = local.pdc_agent_enabled ? 1 : 0
+
+  id = local.pdc_agent_subnet_ids[0]
+}
 
 resource "aws_iam_role" "pdc_agent_execution" {
   count = local.pdc_agent_enabled ? 1 : 0
@@ -49,32 +87,22 @@ resource "aws_iam_role_policy" "pdc_agent_token" {
         Resource = [var.pdc_agent.token_secret_arn]
       },
       {
+        # Any key in the secret's account, but only when Secrets Manager uses it to decrypt a secret
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
-        Resource = [var.pdc_agent.token_kms_key_arn]
+        Resource = ["arn:aws:kms:${local.pdc_agent_token_secret_arn_parts[3]}:${local.pdc_agent_token_secret_arn_parts[4]}:key/*"]
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${local.pdc_agent_token_secret_arn_parts[3]}.amazonaws.com"
+          }
+        }
       }
     ]
   })
 }
 
-# The agent only makes outbound connections and needs no AWS permissions of its own
-resource "aws_iam_role" "pdc_agent_task" {
-  count = local.pdc_agent_enabled ? 1 : 0
-
-  name = "grafana-pdc-agent-task"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
-  })
-
-  tags = var.tags
-}
-
 resource "aws_cloudwatch_log_group" "pdc_agent" {
+  #checkov:skip=CKV_AWS_158:The agent's logs hold no sensitive data, and CloudWatch Logs encrypts them at rest by default
   count = local.pdc_agent_enabled ? 1 : 0
 
   name              = "/ecs/${local.pdc_agent_name}"
@@ -88,22 +116,19 @@ resource "aws_security_group" "pdc_agent" {
 
   name        = local.pdc_agent_name
   description = "Grafana PDC agent, outbound only"
-  vpc_id      = var.pdc_agent.vpc_id
+  vpc_id      = data.aws_subnet.pdc_agent[0].vpc_id
 
   tags = merge(var.tags, { Name = local.pdc_agent_name })
 }
 
-# HTTPS for the PDC API and AWS endpoints, SSH for the tunnel to the PDC gateway
 resource "aws_vpc_security_group_egress_rule" "pdc_agent" {
-  for_each = local.pdc_agent_enabled ? {
-    for pair in setproduct(var.pdc_agent.egress_cidr_blocks, [22, 443]) : "${pair[0]}-${pair[1]}" => pair
-  } : {}
+  for_each = local.pdc_agent_egress_rules
 
   security_group_id = aws_security_group.pdc_agent[0].id
-  description       = "Allow outbound ${each.value[1]}"
-  cidr_ipv4         = each.value[0]
-  from_port         = each.value[1]
-  to_port           = each.value[1]
+  description       = "Allow outbound TCP ${each.value.port}"
+  cidr_ipv4         = each.value.cidr_block
+  from_port         = each.value.port
+  to_port           = each.value.port
   ip_protocol       = "tcp"
 }
 
@@ -121,6 +146,7 @@ resource "aws_ecs_cluster" "pdc_agent" {
 }
 
 resource "aws_ecs_task_definition" "pdc_agent" {
+  #checkov:skip=CKV_AWS_336:The agent writes SSH keys to its home directory, and Fargate volumes are not writable by its non-root user
   count = local.pdc_agent_enabled ? 1 : 0
 
   family                   = local.pdc_agent_name
@@ -129,26 +155,33 @@ resource "aws_ecs_task_definition" "pdc_agent" {
   cpu                      = var.pdc_agent.cpu
   memory                   = var.pdc_agent.memory
   execution_role_arn       = aws_iam_role.pdc_agent_execution[0].arn
-  task_role_arn            = aws_iam_role.pdc_agent_task[0].arn
 
   container_definitions = jsonencode([{
     name      = local.pdc_agent_name
     image     = var.pdc_agent.image
     essential = true
+    # The image's non-root user, set explicitly so the task definition shows it
+    user = "30000:30000"
     command = concat([
-      "-cluster", var.pdc_agent.cluster_name,
-      "-gcloud-hosted-grafana-id", var.stack_id,
+      "-cluster", local.stack.cluster,
+      "-gcloud-hosted-grafana-id", local.stack.id,
     ], var.pdc_agent.extra_args)
     secrets = [{
       name      = "GCLOUD_PDC_SIGNING_TOKEN"
       valueFrom = var.pdc_agent.token_secret_arn
     }]
-    readonlyRootFilesystem = true
+    # The agent creates its SSH keys and known hosts under $HOME/.ssh when it starts
+    readonlyRootFilesystem = false
+    linuxParameters = {
+      capabilities = {
+        drop = ["ALL"]
+      }
+    }
     logConfiguration = {
       logDriver = "awslogs"
       options = {
         awslogs-group         = aws_cloudwatch_log_group.pdc_agent[0].name
-        awslogs-region        = data.aws_region.current.region
+        awslogs-region        = data.aws_region.current[0].region
         awslogs-stream-prefix = "agent"
       }
     }
@@ -166,7 +199,8 @@ resource "aws_ecs_service" "pdc_agent" {
   launch_type     = "FARGATE"
   desired_count   = var.pdc_agent.desired_count
 
-  # Replace tasks gradually so tunnels stay connected during restarts
+  # Keep tasks spread across availability zones, and replace them gradually so tunnels stay connected during restarts
+  availability_zone_rebalancing      = "ENABLED"
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
 
@@ -176,7 +210,7 @@ resource "aws_ecs_service" "pdc_agent" {
   }
 
   network_configuration {
-    subnets          = var.pdc_agent.subnet_ids
+    subnets          = local.pdc_agent_subnet_ids
     security_groups  = [aws_security_group.pdc_agent[0].id]
     assign_public_ip = false
   }
