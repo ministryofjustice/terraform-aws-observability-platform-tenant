@@ -63,7 +63,7 @@ To let the agent reach your data sources:
 
 To opt out of the agent, set `grafana_cloud = { pdc_agent = { enabled = false } }`.
 
-The agent reads its token from the secret in the `observability_platform_account_id` account. If the agent is deployed before the secret exists, its tasks fail to start and ECS stops retrying them, so once Observability Platform has created the secret, run:
+The agent reads its token from the secret in the `observability_platform_account_id` account when it starts. If the agent is deployed before the secret exists, ECS keeps retrying its tasks, at most 27 minutes apart, so the agent starts by itself once the secret exists. The agent doesn't notice when the token changes, so after Observability Platform replaces the token, restart the agent:
 
 ```bash
 aws ecs update-service --cluster grafana-pdc-agent --service grafana-pdc-agent --force-new-deployment

@@ -238,9 +238,11 @@ resource "aws_ecs_service" "pdc_agent" {
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
 
+  # Without the circuit breaker, ECS keeps retrying tasks that fail to start, at most 27 minutes apart, so an agent
+  # deployed before Observability Platform creates its token secret starts by itself once the secret exists
   deployment_circuit_breaker {
-    enable   = true
-    rollback = true
+    enable   = false
+    rollback = false
   }
 
   network_configuration {
