@@ -45,7 +45,7 @@ variable "grafana_cloud" {
     stack               = optional(string, "production")
     additional_policies = optional(map(string), {})
     pdc_agent = optional(object({
-      enabled          = optional(bool, false)
+      enabled          = optional(bool, true)
       token_secret_arn = optional(string)
       subnet_ids       = optional(list(string))
       allowed_targets = optional(list(object({
@@ -64,13 +64,13 @@ variable "grafana_cloud" {
     }), {})
   })
   description = <<-EOT
-    Grafana Cloud settings. The defaults create the 'grafana-cloud' role for the production stack, and no PDC agent.
+    Grafana Cloud settings. The defaults create the 'grafana-cloud' role for the production stack, and a PDC agent in the Modernisation Platform general private subnets.
 
-    - enabled: create the 'grafana-cloud' role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus.
+    - enabled: create the 'grafana-cloud' role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and the PDC agent.
     - stack: the Observability Platform stack trusted to assume the role, 'development' or 'production'.
     - additional_policies: ARNs of policies to attach to the 'grafana-cloud' role only.
-    - pdc_agent: a Private Data Source Connect agent, needed only to query data sources inside the VPC.
-      - enabled: run the agent on ECS Fargate.
+    - pdc_agent: a Private Data Source Connect agent, so Grafana Cloud can query data sources inside the VPC.
+      - enabled: run the agent on ECS Fargate. Set to false to opt out.
       - token_secret_arn: full ARN of the agent's token secret. Defaults to the secret Observability Platform creates for this account, grafana-cloud/pdc/<account ID>.
       - subnet_ids: subnets to run the agent in. Defaults to the Modernisation Platform general private subnets.
       - allowed_targets: CIDR blocks and TCP ports of the data sources the agent may connect to.
@@ -83,10 +83,6 @@ variable "grafana_cloud" {
   validation {
     condition     = contains(["development", "production"], var.grafana_cloud.stack)
     error_message = "grafana_cloud.stack must be 'development' or 'production'"
-  }
-  validation {
-    condition     = var.grafana_cloud.enabled || !var.grafana_cloud.pdc_agent.enabled
-    error_message = "grafana_cloud.pdc_agent.enabled requires grafana_cloud.enabled"
   }
   validation {
     condition     = var.grafana_cloud.pdc_agent.token_secret_arn == null || can(regex("^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$", var.grafana_cloud.pdc_agent.token_secret_arn))

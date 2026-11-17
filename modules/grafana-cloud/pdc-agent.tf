@@ -49,7 +49,7 @@ data "aws_subnets" "pdc_agent" {
   lifecycle {
     postcondition {
       condition     = length(self.ids) > 0
-      error_message = "No Modernisation Platform general private subnets were found. Set grafana_cloud.pdc_agent.subnet_ids to the private subnets the PDC agent should run in."
+      error_message = "No Modernisation Platform general private subnets were found. Set grafana_cloud.pdc_agent.subnet_ids to the private subnets the PDC agent should run in, or set grafana_cloud.pdc_agent.enabled to false."
     }
   }
 }

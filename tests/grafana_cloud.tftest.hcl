@@ -29,7 +29,7 @@ variables {
   observability_platform_account_id = "111111111111"
 }
 
-run "grafana_cloud_role_by_default" {
+run "grafana_cloud_by_default" {
   command = apply
 
   assert {
@@ -38,8 +38,8 @@ run "grafana_cloud_role_by_default" {
   }
 
   assert {
-    condition     = output.grafana_cloud_pdc_agent_execution_role_arn == null && output.grafana_cloud_pdc_agent_security_group_id == null
-    error_message = "The PDC agent should not be created by default"
+    condition     = output.grafana_cloud_pdc_agent_execution_role_arn != null && output.grafana_cloud_pdc_agent_security_group_id != null
+    error_message = "The PDC agent should be created by default"
   }
 }
 
@@ -54,24 +54,29 @@ run "grafana_cloud_disabled" {
 
   assert {
     condition     = length(module.grafana_cloud) == 0
-    error_message = "No Grafana Cloud resources should be created when grafana_cloud.enabled is false"
+    error_message = "No Grafana Cloud resources, including the PDC agent, should be created when grafana_cloud.enabled is false"
   }
 }
 
-run "pdc_agent" {
+run "pdc_agent_disabled" {
   command = apply
 
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled = true
+        enabled = false
       }
     }
   }
 
   assert {
-    condition     = output.grafana_cloud_pdc_agent_execution_role_arn != null && output.grafana_cloud_pdc_agent_security_group_id != null
-    error_message = "The PDC agent should be created when grafana_cloud.pdc_agent.enabled is true"
+    condition     = output.grafana_cloud_role_arn != null
+    error_message = "The Grafana Cloud role should still be created when the PDC agent is disabled"
+  }
+
+  assert {
+    condition     = output.grafana_cloud_pdc_agent_execution_role_arn == null && output.grafana_cloud_pdc_agent_security_group_id == null
+    error_message = "The PDC agent should not be created when grafana_cloud.pdc_agent.enabled is false"
   }
 }
 
@@ -87,28 +92,12 @@ run "invalid_stack" {
   expect_failures = [var.grafana_cloud]
 }
 
-run "pdc_agent_requires_grafana_cloud" {
-  command = plan
-
-  variables {
-    grafana_cloud = {
-      enabled = false
-      pdc_agent = {
-        enabled = true
-      }
-    }
-  }
-
-  expect_failures = [var.grafana_cloud]
-}
-
 run "pdc_agent_invalid_token_secret_arn" {
   command = plan
 
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled          = true
         token_secret_arn = "grafana-cloud/pdc/111111111111"
       }
     }
@@ -123,7 +112,6 @@ run "pdc_agent_needs_two_tasks" {
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled       = true
         desired_count = 1
       }
     }
@@ -138,7 +126,6 @@ run "pdc_agent_invalid_allowed_target" {
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled         = true
         allowed_targets = [{ cidr_block = "10.0.0.0/16", port = 0 }]
       }
     }

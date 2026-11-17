@@ -7,9 +7,9 @@ This Terraform module provisions the resources [Observability Platform](https://
 | Submodule | Creates |
 | --- | --- |
 | `modules/amazon-managed-grafana` | The `observability-platform` role that Amazon Managed Grafana assumes |
-| `modules/grafana-cloud` | The `grafana-cloud` role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and optionally a [Private Data Source Connect (PDC)](https://grafana.com/docs/grafana-cloud/observe-and-act/connect-externally-hosted/private-data-source-connect/) agent on ECS Fargate |
+| `modules/grafana-cloud` | The `grafana-cloud` role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and a [Private Data Source Connect (PDC)](https://grafana.com/docs/grafana-cloud/observe-and-act/connect-externally-hosted/private-data-source-connect/) agent on ECS Fargate |
 
-Both roles are created by default. The PDC agent is only needed to query data sources inside a VPC.
+Both roles and the PDC agent are created by default. The agent lets Grafana Cloud query data sources inside the VPC.
 
 Grafana Cloud data sources assume the `grafana-cloud` role with [Grafana Assume Role](https://grafana.com/docs/grafana/latest/datasources/aws-cloudwatch/aws-authentication/#use-grafana-assume-role), using the stack's shared external ID. Data sources with a unique per-data-source external ID can't assume it.
 
@@ -34,10 +34,11 @@ The role trusts Observability Platform's production stack. To try the developmen
 
 ### Querying data sources inside a VPC
 
-To query data sources that are only reachable inside your VPC, such as OpenSearch or a database, run the PDC agent:
+The module runs a PDC agent by default, so Grafana Cloud can query data sources that are only reachable inside your VPC, such as OpenSearch or a database. When the account is added to the Grafana Cloud tenant configuration, Observability Platform creates a PDC token for it, in a secret named `grafana-cloud/pdc/<account ID>` that only the agent can read.
 
-1. Set `pdc_enabled = true` for the account in the Grafana Cloud tenant configuration. Observability Platform creates a PDC token for the account, in a secret named `grafana-cloud/pdc/<account ID>` that only the agent can read.
-1. Enable the agent, with the data sources it may connect to:
+To let the agent reach your data sources:
+
+1. Set the data sources it may connect to:
 
    ```hcl
    module "observability_platform_tenant" {
@@ -48,7 +49,6 @@ To query data sources that are only reachable inside your VPC, such as OpenSearc
 
      grafana_cloud = {
        pdc_agent = {
-         enabled = true
          allowed_targets = [
            { cidr_block = "10.26.0.0/21", port = 443 },
          ]
@@ -61,13 +61,15 @@ To query data sources that are only reachable inside your VPC, such as OpenSearc
 
 1. Allow the agent's security group, output as `grafana_cloud_pdc_agent_security_group_id`, into each data source's security group.
 
+To opt out of the agent, set `grafana_cloud = { pdc_agent = { enabled = false } }`.
+
 The agent reads its token from the secret in the `observability_platform_account_id` account. If the agent is deployed before the secret exists, its tasks fail to start and ECS stops retrying them, so once Observability Platform has created the secret, run:
 
 ```bash
 aws ecs update-service --cluster grafana-pdc-agent --service grafana-pdc-agent --force-new-deployment
 ```
 
-By default the agent runs three tasks in the Modernisation Platform `general-private` subnets. Outside Modernisation Platform, set `subnet_ids`.
+By default the agent runs three tasks in the Modernisation Platform `general-private` subnets. Outside Modernisation Platform, set `subnet_ids`, or opt out.
 
 The agent connects out to Grafana Cloud's PDC API on port 443 and PDC gateway on port 22, and to Docker Hub, Secrets Manager and CloudWatch Logs on port 443.
 Its subnets need a NAT gateway, or PrivateLink and VPC endpoints for those services. To limit where it can connect, set `egress_cidr_blocks`.
@@ -91,10 +93,10 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 
 | `grafana_cloud` attribute | Description | Default |
 | --- | --- | --- |
-| `enabled` | Create the `grafana-cloud` role | `true` |
+| `enabled` | Create the `grafana-cloud` role and the PDC agent | `true` |
 | `stack` | Observability Platform stack trusted to assume the role, and that the PDC agent connects to: `development` or `production` | `"production"` |
 | `additional_policies` | ARNs of policies to attach to the `grafana-cloud` role only | `{}` |
-| `pdc_agent.enabled` | Run the PDC agent | `false` |
+| `pdc_agent.enabled` | Run the PDC agent | `true` |
 | `pdc_agent.token_secret_arn` | Full ARN of the agent's token secret, to use a different secret | `grafana-cloud/pdc/<account ID>` in Observability Platform |
 | `pdc_agent.subnet_ids` | Private subnets to run the agent in | Modernisation Platform `general-private` subnets |
 | `pdc_agent.allowed_targets` | CIDR blocks and TCP ports of data sources the agent may connect to | `[]` |
@@ -119,6 +121,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 
 - The Amazon Managed Grafana role moves into `module.amazon_managed_grafana` with `moved` blocks, so it is not recreated.
 - The `grafana-cloud` role is created by default. If the account already has a role with that name, import it, or set `grafana_cloud = { enabled = false }`.
+- The PDC agent is created by default, as three ECS Fargate tasks in the Modernisation Platform `general-private` subnets. Its tasks start once Observability Platform has created the account's token. Outside Modernisation Platform, set `grafana_cloud.pdc_agent.subnet_ids`, or opt out with `grafana_cloud = { pdc_agent = { enabled = false } }`.
 - `additional_policies` are also attached to the `grafana-cloud` role, so data sources keep the same access in Grafana Cloud.
 - Terraform 1.3 or later is required.
 
