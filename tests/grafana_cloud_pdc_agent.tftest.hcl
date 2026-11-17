@@ -65,8 +65,8 @@ run "pdc_agent_development_stack" {
 
   assert {
     condition = jsondecode(aws_ecs_task_definition.pdc_agent[0].container_definitions)[0].command == [
-      "-api-fqdn", "private-datasource-connect-api.eu-west-2.vpce.grafana.net",
-      "-gateway-fqdn", "private-datasource-connect.eu-west-2.vpce.grafana.net",
+      "-api-fqdn", "pdc-grafana-datasources-api.eu-west-2.vpce.grafana.net",
+      "-gateway-fqdn", "pdc-grafana-datasources.eu-west-2.vpce.grafana.net",
       "-gcloud-hosted-grafana-id", "1907843", "-retrymax", "2880", "-log.level", "debug",
     ]
     error_message = "The PDC agent should connect to the development stack through the PDC PrivateLink endpoints, with the extra arguments"

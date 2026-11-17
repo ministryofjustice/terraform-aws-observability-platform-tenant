@@ -20,11 +20,11 @@ locals {
   # Region and account of the token secret and its KMS key: arn:aws:secretsmanager:<region>:<account>:secret:<name>
   pdc_agent_token_secret_arn_parts = local.pdc_agent_enabled ? split(":", local.pdc_agent_token_secret_arn) : []
 
-  # Grafana Cloud's PDC PrivateLink endpoints in the agent's VPC, whose private DNS names are based on the stack's
-  # AWS region, or else the stack's cluster over the internet
+  # Grafana Cloud's PDC PrivateLink endpoints in the agent's VPC, or else the stack's cluster over the internet. The private
+  # DNS names are the ones the endpoint services publish (PrivateDnsName), not the generic names in Grafana's docs.
   pdc_agent_endpoint_args = var.pdc_agent.privatelink ? [
-    "-api-fqdn", "private-datasource-connect-api.${local.stack.aws_region}.vpce.grafana.net",
-    "-gateway-fqdn", "private-datasource-connect.${local.stack.aws_region}.vpce.grafana.net",
+    "-api-fqdn", "pdc-grafana-datasources-api.${local.stack.aws_region}.vpce.grafana.net",
+    "-gateway-fqdn", "pdc-grafana-datasources.${local.stack.aws_region}.vpce.grafana.net",
   ] : ["-cluster", local.stack.cluster]
 
   # Grafana Cloud PDC API and AWS APIs on 443, and the PDC gateway SSH tunnel on 22, plus the private data sources
