@@ -45,7 +45,7 @@ variable "grafana_cloud" {
     stack               = optional(string, "production")
     additional_policies = optional(map(string), {})
     pdc_agent = optional(object({
-      enabled          = optional(bool, true)
+      enabled          = optional(bool, false)
       token_secret_arn = optional(string)
       subnet_ids       = optional(list(string))
       allowed_targets = optional(list(object({
@@ -65,13 +65,13 @@ variable "grafana_cloud" {
     }), {})
   })
   description = <<-EOT
-    Grafana Cloud settings. The defaults create the 'grafana-cloud' role for the production stack, and a PDC agent in the Modernisation Platform general private subnets.
+    Grafana Cloud settings. The defaults create the 'grafana-cloud' role for the production stack. The PDC agent is opt-in.
 
-    - enabled: create the 'grafana-cloud' role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and the PDC agent.
+    - enabled: create the 'grafana-cloud' role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and the PDC agent if it's enabled.
     - stack: the Observability Platform stack trusted to assume the role, 'development' or 'production'.
     - additional_policies: ARNs of policies to attach to the 'grafana-cloud' role only.
     - pdc_agent: a Private Data Source Connect agent, so Grafana Cloud can query data sources inside the VPC.
-      - enabled: run the agent on ECS Fargate. Set to false to opt out.
+      - enabled: run the agent on ECS Fargate. Must match the account's pdc_enabled setting in Observability Platform's Grafana Cloud tenant configuration.
       - token_secret_arn: full ARN of the agent's token secret. Defaults to the secret Observability Platform creates for this account, grafana-cloud/pdc/<account ID>.
       - subnet_ids: subnets to run the agent in. Defaults to the Modernisation Platform general private subnets.
       - allowed_targets: CIDR blocks and TCP ports of the data sources the agent may connect to.

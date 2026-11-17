@@ -38,8 +38,8 @@ run "grafana_cloud_by_default" {
   }
 
   assert {
-    condition     = output.grafana_cloud_pdc_agent_execution_role_arn != null && output.grafana_cloud_pdc_agent_security_group_id != null
-    error_message = "The PDC agent should be created by default"
+    condition     = output.grafana_cloud_pdc_agent_execution_role_arn == null && output.grafana_cloud_pdc_agent_security_group_id == null
+    error_message = "The PDC agent should not be created by default"
   }
 }
 
@@ -58,25 +58,20 @@ run "grafana_cloud_disabled" {
   }
 }
 
-run "pdc_agent_disabled" {
+run "pdc_agent_enabled" {
   command = apply
 
   variables {
     grafana_cloud = {
       pdc_agent = {
-        enabled = false
+        enabled = true
       }
     }
   }
 
   assert {
-    condition     = output.grafana_cloud_role_arn != null
-    error_message = "The Grafana Cloud role should still be created when the PDC agent is disabled"
-  }
-
-  assert {
-    condition     = output.grafana_cloud_pdc_agent_execution_role_arn == null && output.grafana_cloud_pdc_agent_security_group_id == null
-    error_message = "The PDC agent should not be created when grafana_cloud.pdc_agent.enabled is false"
+    condition     = output.grafana_cloud_pdc_agent_execution_role_arn != null && output.grafana_cloud_pdc_agent_security_group_id != null
+    error_message = "The PDC agent should be created when grafana_cloud.pdc_agent.enabled is true"
   }
 }
 

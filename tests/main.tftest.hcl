@@ -16,13 +16,6 @@ provider "aws" {
 
 variables {
   observability_platform_account_id = "111111111111"
-
-  # LocalStack only serves IAM here. The PDC agent is tested with a mocked provider in grafana_cloud.tftest.hcl.
-  grafana_cloud = {
-    pdc_agent = {
-      enabled = false
-    }
-  }
 }
 
 run "main" {
