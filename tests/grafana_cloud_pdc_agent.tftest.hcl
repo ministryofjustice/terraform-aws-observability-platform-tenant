@@ -168,6 +168,23 @@ run "pdc_agent_without_general_private_subnets" {
   expect_failures = [data.aws_subnets.pdc_agent]
 }
 
+run "pdc_agent_general_private_subnets_in_several_vpcs" {
+  command = plan
+
+  module {
+    source = "./modules/grafana-cloud"
+  }
+
+  override_data {
+    target = data.aws_subnets.pdc_agent_vpc
+    values = {
+      ids = ["subnet-0aaaaaaaaaaaaaaaa"]
+    }
+  }
+
+  expect_failures = [data.aws_subnets.pdc_agent_vpc]
+}
+
 run "production_stack_without_pdc_agent" {
   command = plan
 

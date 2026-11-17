@@ -60,6 +60,28 @@ data "aws_subnet" "pdc_agent" {
   id = local.pdc_agent_subnet_ids[0]
 }
 
+# Accounts that own several VPCs' subnets, such as core-vpc, would otherwise fail when the ECS service is created
+data "aws_subnets" "pdc_agent_vpc" {
+  count = local.pdc_agent_enabled && var.pdc_agent.subnet_ids == null ? 1 : 0
+
+  filter {
+    name   = "tag:Name"
+    values = ["*-general-private-*"]
+  }
+
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_subnet.pdc_agent[0].vpc_id]
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = length(self.ids) == length(data.aws_subnets.pdc_agent[0].ids)
+      error_message = "Modernisation Platform general private subnets were found in more than one VPC. Set grafana_cloud.pdc_agent.subnet_ids to the private subnets the PDC agent should run in, or set grafana_cloud.pdc_agent.enabled to false."
+    }
+  }
+}
+
 resource "aws_iam_role" "pdc_agent_execution" {
   count = local.pdc_agent_enabled ? 1 : 0
 

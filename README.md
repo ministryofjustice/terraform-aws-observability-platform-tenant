@@ -69,7 +69,7 @@ The agent reads its token from the secret in the `observability_platform_account
 aws ecs update-service --cluster grafana-pdc-agent --service grafana-pdc-agent --force-new-deployment
 ```
 
-By default the agent runs three tasks in the Modernisation Platform `general-private` subnets. Outside Modernisation Platform, set `subnet_ids`, or opt out.
+By default the agent runs three tasks in the Modernisation Platform `general-private` subnets. Outside Modernisation Platform member accounts, or in accounts with more than one VPC's `general-private` subnets such as core-vpc, set `subnet_ids`, or opt out.
 
 The agent connects out to Grafana Cloud's PDC API on port 443 and PDC gateway on port 22, and to Docker Hub, Secrets Manager and CloudWatch Logs on port 443.
 Its subnets need a NAT gateway, or PrivateLink and VPC endpoints for those services. To limit where it can connect, set `egress_cidr_blocks`.
@@ -121,7 +121,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 
 - The Amazon Managed Grafana role moves into `module.amazon_managed_grafana` with `moved` blocks, so it is not recreated.
 - The `grafana-cloud` role is created by default. If the account already has a role with that name, import it, or set `grafana_cloud = { enabled = false }`.
-- The PDC agent is created by default, as three ECS Fargate tasks in the Modernisation Platform `general-private` subnets. Its tasks start once Observability Platform has created the account's token. Outside Modernisation Platform, set `grafana_cloud.pdc_agent.subnet_ids`, or opt out with `grafana_cloud = { pdc_agent = { enabled = false } }`.
+- The PDC agent is created by default, as three ECS Fargate tasks in the Modernisation Platform `general-private` subnets. Its tasks start once Observability Platform has created the account's token. Accounts without one VPC's `general-private` subnets, such as the Modernisation Platform core accounts and Analytical Platform, must set `grafana_cloud.pdc_agent.subnet_ids` or opt out with `grafana_cloud = { pdc_agent = { enabled = false } }`, or their plan fails.
 - `additional_policies` are also attached to the `grafana-cloud` role, so data sources keep the same access in Grafana Cloud.
 - Terraform 1.3 or later is required.
 
