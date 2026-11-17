@@ -61,6 +61,7 @@ variable "grafana_cloud" {
       log_retention_days = optional(number, 365)
       alarm_actions      = optional(list(string), [])
       egress_cidr_blocks = optional(list(string), ["0.0.0.0/0"])
+      privatelink        = optional(bool, true)
     }), {})
   })
   description = <<-EOT
@@ -76,6 +77,7 @@ variable "grafana_cloud" {
       - allowed_targets: CIDR blocks and TCP ports of the data sources the agent may connect to.
       - desired_count: number of agent tasks, at least 2.
       - egress_cidr_blocks: CIDR blocks the agent may reach on ports 22 and 443, for Grafana Cloud and AWS APIs.
+      - privatelink: connect to Grafana Cloud through its PDC PrivateLink endpoints in the agent's VPC. Set to false to connect over the internet, which needs outbound port 22.
   EOT
   default     = {}
   nullable    = false

@@ -20,6 +20,13 @@ locals {
   # Region and account of the token secret and its KMS key: arn:aws:secretsmanager:<region>:<account>:secret:<name>
   pdc_agent_token_secret_arn_parts = local.pdc_agent_enabled ? split(":", local.pdc_agent_token_secret_arn) : []
 
+  # Grafana Cloud's PDC PrivateLink endpoints in the agent's VPC, whose private DNS names are based on the stack's
+  # AWS region, or else the stack's cluster over the internet
+  pdc_agent_endpoint_args = var.pdc_agent.privatelink ? [
+    "-api-fqdn", "private-datasource-connect-api.${local.stack.aws_region}.vpce.grafana.net",
+    "-gateway-fqdn", "private-datasource-connect.${local.stack.aws_region}.vpce.grafana.net",
+  ] : ["-cluster", local.stack.cluster]
+
   # Grafana Cloud PDC API and AWS APIs on 443, and the PDC gateway SSH tunnel on 22, plus the private data sources
   pdc_agent_egress_rules = local.pdc_agent_enabled ? {
     for rule in distinct(concat(
@@ -196,9 +203,11 @@ resource "aws_ecs_task_definition" "pdc_agent" {
     essential = true
     # The image's non-root user, set explicitly so the task definition shows it
     user = "30000:30000"
-    command = concat([
-      "-cluster", local.stack.cluster,
+    command = concat(local.pdc_agent_endpoint_args, [
       "-gcloud-hosted-grafana-id", local.stack.id,
+      # Retry the PDC API every 30 seconds for about a day, rather than exiting after about 30 seconds, for example while
+      # the VPC has no PrivateLink endpoints yet. ECS replaces tasks that exit straight away, pulling the image each time
+      "-retrymax", "2880",
     ], var.pdc_agent.extra_args)
     secrets = [{
       name      = "GCLOUD_PDC_SIGNING_TOKEN"

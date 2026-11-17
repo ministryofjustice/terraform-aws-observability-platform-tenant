@@ -31,6 +31,7 @@ variable "pdc_agent" {
     log_retention_days = number
     alarm_actions      = list(string)
     egress_cidr_blocks = list(string)
+    privatelink        = bool
   })
   description = "Private Data Source Connect agent settings. Defaults are set by the root module"
 }

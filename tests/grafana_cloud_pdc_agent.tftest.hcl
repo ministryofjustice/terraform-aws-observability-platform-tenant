@@ -47,6 +47,7 @@ variables {
     log_retention_days = 365
     alarm_actions      = []
     egress_cidr_blocks = ["0.0.0.0/0"]
+    privatelink        = true
   }
 }
 
@@ -64,9 +65,11 @@ run "pdc_agent_development_stack" {
 
   assert {
     condition = jsondecode(aws_ecs_task_definition.pdc_agent[0].container_definitions)[0].command == [
-      "-cluster", "prod-gb-south-1", "-gcloud-hosted-grafana-id", "1907843", "-log.level", "debug",
+      "-api-fqdn", "private-datasource-connect-api.eu-west-2.vpce.grafana.net",
+      "-gateway-fqdn", "private-datasource-connect.eu-west-2.vpce.grafana.net",
+      "-gcloud-hosted-grafana-id", "1907843", "-retrymax", "2880", "-log.level", "debug",
     ]
-    error_message = "The PDC agent should connect to the development stack, with the extra arguments"
+    error_message = "The PDC agent should connect to the development stack through the PDC PrivateLink endpoints, with the extra arguments"
   }
 
   assert {
@@ -120,6 +123,25 @@ run "pdc_agent_token_secret_override" {
       jsondecode(aws_iam_role_policy.pdc_agent_token[0].policy).Statement[1].Condition.StringEquals["kms:ViaService"] == "secretsmanager.eu-west-1.amazonaws.com"
     )
     error_message = "The PDC agent should read the given token secret, and decrypt it with keys in that secret's account and region"
+  }
+}
+
+run "pdc_agent_over_the_internet" {
+  command = apply
+
+  module {
+    source = "./modules/grafana-cloud"
+  }
+
+  variables {
+    pdc_agent = merge(var.pdc_agent, { privatelink = false })
+  }
+
+  assert {
+    condition = jsondecode(aws_ecs_task_definition.pdc_agent[0].container_definitions)[0].command == [
+      "-cluster", "prod-gb-south-1", "-gcloud-hosted-grafana-id", "1907843", "-retrymax", "2880", "-log.level", "debug",
+    ]
+    error_message = "The PDC agent should connect to the stack's cluster over the internet when PrivateLink is off"
   }
 }
 

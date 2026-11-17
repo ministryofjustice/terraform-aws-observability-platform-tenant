@@ -71,8 +71,9 @@ aws ecs update-service --cluster grafana-pdc-agent --service grafana-pdc-agent -
 
 By default the agent runs three tasks in the Modernisation Platform `general-private` subnets. Outside Modernisation Platform member accounts, or in accounts with more than one VPC's `general-private` subnets such as core-vpc, set `subnet_ids`, or opt out.
 
-The agent connects out to Grafana Cloud's PDC API on port 443 and PDC gateway on port 22, and to Docker Hub, Secrets Manager and CloudWatch Logs on port 443.
-Its subnets need a NAT gateway, or PrivateLink and VPC endpoints for those services. To limit where it can connect, set `egress_cidr_blocks`.
+The agent connects to Grafana Cloud's PDC API on port 443 and PDC gateway on port 22 through Grafana Cloud's [PDC PrivateLink endpoints](https://grafana.com/docs/grafana-cloud/observe-and-act/connect-externally-hosted/private-data-source-connect/pdc-agent-aws-privatelink/) in its VPC, which Modernisation Platform manages in core-vpc. Until the endpoints exist, the agent keeps retrying, and connects once they do. Outside Modernisation Platform, create the endpoints in the agent's VPC, or set `privatelink = false` to connect over the internet, which needs outbound port 22.
+
+The agent also connects to Docker Hub, Secrets Manager and CloudWatch Logs on port 443, so its subnets need a NAT gateway, or VPC endpoints for those services. To limit where it can connect, set `egress_cidr_blocks`.
 Docker Hub may rate limit anonymous image pulls. To avoid this, set `image` to a copy in ECR, for example through a pull through cache.
 
 The agent runs as a non-root user with all Linux capabilities dropped. Its root filesystem is writable, because it writes SSH keys to its home directory when it starts, and Fargate volumes are not writable by non-root users.
@@ -107,6 +108,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 | `pdc_agent.log_retention_days` | Days to keep the agent's logs | `365` |
 | `pdc_agent.alarm_actions` | ARNs to notify when fewer agent tasks are running than desired | `[]` |
 | `pdc_agent.egress_cidr_blocks` | CIDR blocks the agent may reach on ports 22 and 443, for Grafana Cloud and AWS APIs | `["0.0.0.0/0"]` |
+| `pdc_agent.privatelink` | Connect to Grafana Cloud through the PDC PrivateLink endpoints in the agent's VPC, or over the internet if `false` | `true` |
 
 ## Outputs
 
@@ -122,6 +124,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 - The Amazon Managed Grafana role moves into `module.amazon_managed_grafana` with `moved` blocks, so it is not recreated.
 - The `grafana-cloud` role is created by default. If the account already has a role with that name, import it, or set `grafana_cloud = { enabled = false }`.
 - The PDC agent is created by default, as three ECS Fargate tasks in the Modernisation Platform `general-private` subnets. Its tasks start once Observability Platform has created the account's token. Accounts without one VPC's `general-private` subnets, such as the Modernisation Platform core accounts and Analytical Platform, must set `grafana_cloud.pdc_agent.subnet_ids` or opt out with `grafana_cloud = { pdc_agent = { enabled = false } }`, or their plan fails.
+- The PDC agent connects through Grafana Cloud's PDC PrivateLink endpoints in its VPC. Outside Modernisation Platform, create the endpoints, or set `grafana_cloud.pdc_agent.privatelink` to `false` to connect over the internet.
 - `additional_policies` are also attached to the `grafana-cloud` role, so data sources keep the same access in Grafana Cloud.
 - Terraform 1.3 or later is required.
 
