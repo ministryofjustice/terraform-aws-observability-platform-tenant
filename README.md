@@ -9,9 +9,16 @@ This Terraform module provisions the resources [Observability Platform](https://
 | `modules/amazon-managed-grafana` | The `observability-platform` role that Amazon Managed Grafana assumes |
 | `modules/grafana-cloud` | The `grafana-cloud` role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and a [Private Data Source Connect (PDC)](https://grafana.com/docs/grafana-cloud/observe-and-act/connect-externally-hosted/private-data-source-connect/) agent on ECS Fargate |
 
-Both roles and the PDC agent are created by default. The agent lets Grafana Cloud query data sources inside the VPC.
+Both roles are created by default. The PDC agent is opt-in: it lets Grafana Cloud query data sources inside the VPC.
 
 Grafana Cloud data sources assume the `grafana-cloud` role with [Grafana Assume Role](https://grafana.com/docs/grafana/latest/datasources/aws-cloudwatch/aws-authentication/#use-grafana-assume-role), using the stack's shared external ID. Data sources with a unique per-data-source external ID can't assume it.
+
+## Requirements
+
+| Name | Version |
+| --- | --- |
+| Terraform | `~> 1.3` |
+| `hashicorp/aws` | `~> 6.0` |
 
 ## Usage
 
@@ -31,6 +38,73 @@ module "observability_platform_tenant" {
 Then add the account to your tenant in Observability Platform's [Grafana Cloud tenant configuration](https://github.com/ministryofjustice/modernisation-platform-environments/blob/main/terraform/environments/observability-platform/grafana-cloud-tenant-environment-configurations.tf), which sets up its data sources in Grafana Cloud.
 
 The role trusts Observability Platform's production stack. To try the development stack instead, set `grafana_cloud = { stack = "development" }`.
+
+### Moving from Amazon Managed Grafana
+
+Callers of 2.0.0 only need to change the version. The Amazon Managed Grafana role is unchanged, so existing dashboards keep working, and `additional_policies` are also attached to the `grafana-cloud` role, so data sources such as Athena keep the same access in Grafana Cloud:
+
+```hcl
+module "observability_platform_tenant" {
+  source  = "ministryofjustice/observability-platform-tenant/aws"
+  version = "X.X.X"
+
+  observability_platform_account_id = local.environment_management.account_ids["observability-platform-production"]
+
+  # Attached to both the Amazon Managed Grafana and Grafana Cloud roles
+  additional_policies = {
+    additional_athena_policy = aws_iam_policy.grafana_athena_full_access_policy.arn
+  }
+
+  tags = local.tags
+}
+```
+
+### All inputs
+
+Every input, set to its default unless marked otherwise. Only `observability_platform_account_id` is required. See [Inputs](#inputs) for descriptions.
+
+```hcl
+module "observability_platform_tenant" {
+  source  = "ministryofjustice/observability-platform-tenant/aws"
+  version = "X.X.X"
+
+  # Required
+  observability_platform_account_id = local.environment_management.account_ids["observability-platform-production"]
+
+  # Amazon Managed Grafana
+  role_name           = "observability-platform" # must be "observability-platform"
+  enable_prometheus   = false
+  enable_xray         = false
+  additional_policies = {} # attached to both roles, e.g. { athena = aws_iam_policy.athena.arn }
+
+  # Grafana Cloud
+  grafana_cloud = {
+    enabled             = true
+    stack               = "production" # or "development"
+    additional_policies = {}           # attached to the grafana-cloud role only
+
+    pdc_agent = {
+      enabled          = false # opt in, with pdc_enabled = true in Observability Platform
+      token_secret_arn = null  # defaults to grafana-cloud/pdc/<account ID> in Observability Platform
+      subnet_ids       = null  # defaults to the Modernisation Platform general-private subnets
+      allowed_targets = [      # not a default: data sources the agent may connect to
+        { cidr_block = "10.26.0.0/21", port = 443 },
+      ]
+      desired_count      = 3 # at least 2
+      cpu                = 256
+      memory             = 512
+      image              = "docker.io/grafana/pdc-agent@sha256:32332a5d4605598d091ecaec7f977c2aecf3bdb89fb424328b3062f6c5d40561" # 0.0.69
+      extra_args         = []
+      log_retention_days = 365
+      alarm_actions      = [] # e.g. SNS topic ARNs
+      egress_cidr_blocks = ["0.0.0.0/0"]
+      privatelink        = true
+    }
+  }
+
+  tags = local.tags
+}
+```
 
 ### Querying data sources inside a VPC
 
@@ -122,7 +196,7 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 
 - The Amazon Managed Grafana role moves into `module.amazon_managed_grafana` with `moved` blocks, so it is not recreated.
 - The `grafana-cloud` role is created by default. If the account already has a role with that name, import it, or set `grafana_cloud = { enabled = false }`.
-- The PDC agent is opt-in, with `grafana_cloud.pdc_agent.enabled`. It runs as three ECS Fargate tasks in the Modernisation Platform `general-private` subnets, and its tasks start once Observability Platform has created the account's token. Accounts without one VPC's `general-private` subnets, such as the Modernisation Platform core accounts and Analytical Platform, must also set `grafana_cloud.pdc_agent.subnet_ids`, or their plan fails.
+- The PDC agent is opt-in, with `grafana_cloud.pdc_agent.enabled`. It runs as three ECS Fargate tasks in the Modernisation Platform `general-private` subnets, and its tasks start once Observability Platform has created the account's token. When it's enabled in accounts without one VPC's `general-private` subnets, such as the Modernisation Platform core accounts and Analytical Platform, `grafana_cloud.pdc_agent.subnet_ids` must also be set, or the plan fails.
 - The PDC agent connects through Grafana Cloud's PDC PrivateLink endpoints in its VPC. Outside Modernisation Platform, create the endpoints, or set `grafana_cloud.pdc_agent.privatelink` to `false` to connect over the internet.
 - `additional_policies` are also attached to the `grafana-cloud` role, so data sources keep the same access in Grafana Cloud.
 - Terraform 1.3 or later is required.
