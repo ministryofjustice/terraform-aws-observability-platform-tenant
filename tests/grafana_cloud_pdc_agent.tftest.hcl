@@ -12,6 +12,12 @@ mock_provider "aws" {
     }
   }
 
+  mock_resource "aws_ecs_service" {
+    defaults = {
+      arn = "arn:aws:ecs:eu-west-2:tenant:service/grafana-pdc-agent/grafana-pdc-agent"
+    }
+  }
+
   mock_data "aws_subnets" {
     defaults = {
       ids = ["subnet-0aaaaaaaaaaaaaaaa", "subnet-0bbbbbbbbbbbbbbbb", "subnet-0cccccccccccccccc"]
@@ -75,6 +81,40 @@ run "pdc_agent_development_stack" {
   assert {
     condition     = aws_ecs_service.pdc_agent[0].network_configuration[0].subnets == toset(["subnet-0aaaaaaaaaaaaaaaa", "subnet-0bbbbbbbbbbbbbbbb", "subnet-0cccccccccccccccc"])
     error_message = "The PDC agent should run in the Modernisation Platform general private subnets by default"
+  }
+
+  assert {
+    condition = jsonencode(jsondecode(aws_iam_role.pdc_agent_restarter[0].assume_role_policy)) == jsonencode({
+      Version = "2012-10-17"
+      Statement = [{
+        Effect    = "Allow"
+        Action    = "sts:AssumeRole"
+        Principal = { AWS = "arn:aws:iam::${var.observability_platform_account_id}:root" }
+        Condition = {
+          ArnEquals = {
+            "aws:PrincipalArn" = "arn:aws:iam::${var.observability_platform_account_id}:role/grafana-pdc-token-rotator"
+          }
+        }
+      }]
+    })
+    error_message = "Only the named Lambda execution role in the Observability Platform account should be trusted"
+  }
+
+  assert {
+    condition = (
+      aws_iam_role.pdc_agent_restarter[0].path == "/" &&
+      aws_iam_role.pdc_agent_restarter[0].name == "grafana-pdc-agent-restarter" &&
+      aws_iam_role_policy.pdc_agent_restart[0].role == aws_iam_role.pdc_agent_restarter[0].name &&
+      jsonencode(jsondecode(aws_iam_role_policy.pdc_agent_restart[0].policy)) == jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect   = "Allow"
+          Action   = ["ecs:UpdateService", "ecs:DescribeServices"]
+          Resource = "arn:aws:ecs:eu-west-2:tenant:service/grafana-pdc-agent/grafana-pdc-agent"
+        }]
+      })
+    )
+    error_message = "The restarter role should have the agreed name and path and only describe or update the tenant's PDC ECS service"
   }
 
   assert {
@@ -227,5 +267,10 @@ run "production_stack_without_pdc_agent" {
   assert {
     condition     = length(data.aws_subnets.pdc_agent) == 0 && length(aws_ecs_service.pdc_agent) == 0 && length(aws_vpc_security_group_egress_rule.pdc_agent) == 0
     error_message = "No PDC agent resources should be created when the PDC agent is disabled"
+  }
+
+  assert {
+    condition     = length(aws_iam_role.pdc_agent_restarter) == 0 && length(aws_iam_role_policy.pdc_agent_restart) == 0
+    error_message = "No restarter role or policy should be created when the PDC agent is disabled"
   }
 }

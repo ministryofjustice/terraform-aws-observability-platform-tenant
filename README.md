@@ -190,7 +190,16 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 | `amazon_managed_grafana_role_arn` | ARN of the Amazon Managed Grafana role |
 | `grafana_cloud_role_arn` | ARN of the Grafana Cloud role, or null if it is not enabled |
 | `grafana_cloud_pdc_agent_execution_role_arn` | ARN of the PDC agent execution role, or null if the agent is not enabled |
+| `grafana_cloud_pdc_agent_restarter_role_arn` | ARN of the PDC agent restarter role, or null if the agent is not enabled |
 | `grafana_cloud_pdc_agent_security_group_id` | ID of the PDC agent security group, or null if the agent is not enabled |
+
+## Upgrading from 3.0.0
+
+No input changes are needed. When PDC is enabled, the module adds `arn:aws:iam::<tenant-account-id>:role/grafana-pdc-agent-restarter` and its inline policy. The agent still reads its token from the same secret.
+
+The only trusted caller is `arn:aws:iam::<observability-platform-account-id>:role/grafana-pdc-token-rotator` (IAM path `/`), using the account supplied in `observability_platform_account_id`. The tenant role can be created before the rotator role exists. The rotator's identity policy must also allow `sts:AssumeRole` on the tenant role.
+
+In the region where the tenant deployed the agent, the rotator can describe the `grafana-pdc-agent` service in the `grafana-pdc-agent` cluster and call `UpdateService` with `forceNewDeployment=true`. IAM scopes `UpdateService` to that service, not to that API parameter.
 
 ## Upgrading from 2.0.0
 

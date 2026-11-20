@@ -41,6 +41,11 @@ run "grafana_cloud_by_default" {
     condition     = output.grafana_cloud_pdc_agent_execution_role_arn == null && output.grafana_cloud_pdc_agent_security_group_id == null
     error_message = "The PDC agent should not be created by default"
   }
+
+  assert {
+    condition     = output.grafana_cloud_pdc_agent_restarter_role_arn == null
+    error_message = "The restarter role ARN should be null by default"
+  }
 }
 
 run "grafana_cloud_disabled" {
@@ -55,6 +60,11 @@ run "grafana_cloud_disabled" {
   assert {
     condition     = length(module.grafana_cloud) == 0
     error_message = "No Grafana Cloud resources, including the PDC agent, should be created when grafana_cloud.enabled is false"
+  }
+
+  assert {
+    condition     = output.grafana_cloud_pdc_agent_restarter_role_arn == null
+    error_message = "The restarter role ARN should be null when Grafana Cloud is disabled"
   }
 }
 
@@ -72,6 +82,11 @@ run "pdc_agent_enabled" {
   assert {
     condition     = output.grafana_cloud_pdc_agent_execution_role_arn != null && output.grafana_cloud_pdc_agent_security_group_id != null
     error_message = "The PDC agent should be created when grafana_cloud.pdc_agent.enabled is true"
+  }
+
+  assert {
+    condition     = output.grafana_cloud_pdc_agent_restarter_role_arn == module.grafana_cloud[0].pdc_agent_restarter_role_arn
+    error_message = "The tenant restarter role ARN should be exported when PDC is enabled"
   }
 }
 

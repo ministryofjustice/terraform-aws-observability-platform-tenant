@@ -142,6 +142,44 @@ resource "aws_iam_role_policy" "pdc_agent_token" {
   })
 }
 
+resource "aws_iam_role" "pdc_agent_restarter" {
+  count = local.pdc_agent_enabled ? 1 : 0
+
+  name = "grafana-pdc-agent-restarter"
+  path = "/"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = "sts:AssumeRole"
+      # Match the exact role ARN without requiring the rotator role to exist at tenant apply time.
+      Principal = { AWS = "arn:aws:iam::${var.observability_platform_account_id}:root" }
+      Condition = {
+        ArnEquals = {
+          "aws:PrincipalArn" = "arn:aws:iam::${var.observability_platform_account_id}:role/grafana-pdc-token-rotator"
+        }
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "pdc_agent_restart" {
+  count = local.pdc_agent_enabled ? 1 : 0
+
+  name = "restart-pdc-agent"
+  role = aws_iam_role.pdc_agent_restarter[0].name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ecs:UpdateService", "ecs:DescribeServices"]
+      Resource = aws_ecs_service.pdc_agent[0].arn
+    }]
+  })
+}
+
 resource "aws_cloudwatch_log_group" "pdc_agent" {
   #checkov:skip=CKV_AWS_158:The agent's logs hold no sensitive data, and CloudWatch Logs encrypts them at rest by default
   count = local.pdc_agent_enabled ? 1 : 0
