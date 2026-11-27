@@ -1,5 +1,11 @@
 # Amazon Managed Grafana
 
+variable "enable_amazon_managed_grafana" {
+  type        = bool
+  description = "Create the Amazon Managed Grafana role and its policy attachments. Disable for tenants that only use Grafana Cloud"
+  default     = true
+}
+
 variable "role_name" {
   type        = string
   description = "Name of the Amazon Managed Grafana role to create. This is set as a variable but Observability Platform requires this to be set to 'observability-platform'"
@@ -33,7 +39,7 @@ variable "enable_xray" {
 
 variable "additional_policies" {
   type        = map(string)
-  description = "ARNs of any policies to attach to the Amazon Managed Grafana role. They are also attached to the Grafana Cloud role, so data sources keep working when they move to Grafana Cloud"
+  description = "ARNs of policies to attach to both enabled roles, so data sources keep working when they move from Amazon Managed Grafana to Grafana Cloud"
   default     = {}
 }
 

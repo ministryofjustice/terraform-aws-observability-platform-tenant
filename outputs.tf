@@ -1,6 +1,6 @@
 output "amazon_managed_grafana_role_arn" {
-  description = "ARN of the Amazon Managed Grafana role"
-  value       = module.amazon_managed_grafana.role_arn
+  description = "ARN of the Amazon Managed Grafana role, or null if Amazon Managed Grafana is not enabled"
+  value       = one(module.amazon_managed_grafana[*].role_arn)
 }
 
 output "grafana_cloud_role_arn" {
