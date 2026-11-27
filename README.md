@@ -9,7 +9,7 @@ This Terraform module provisions the resources [Observability Platform](https://
 | `modules/amazon-managed-grafana` | The `observability-platform` role that Amazon Managed Grafana assumes |
 | `modules/grafana-cloud` | The `grafana-cloud` role that Grafana Cloud assumes to read CloudWatch, X-Ray and Amazon Managed Service for Prometheus, and a [Private Data Source Connect (PDC)](https://grafana.com/docs/grafana-cloud/observe-and-act/connect-externally-hosted/private-data-source-connect/) agent on ECS Fargate |
 
-Both roles are created by default. The PDC agent is opt-in: it lets Grafana Cloud query data sources inside the VPC.
+Both roles are created by default. Set `enable_amazon_managed_grafana = false` to skip the AMG role and its policy attachments without affecting Grafana Cloud. The PDC agent is opt-in: it lets Grafana Cloud query data sources inside the VPC.
 
 Grafana Cloud data sources assume the `grafana-cloud` role with [Grafana Assume Role](https://grafana.com/docs/grafana/latest/datasources/aws-cloudwatch/aws-authentication/#use-grafana-assume-role), using the stack's shared external ID. Data sources with a unique per-data-source external ID can't assume it.
 
@@ -72,10 +72,11 @@ module "observability_platform_tenant" {
   observability_platform_account_id = local.environment_management.account_ids["observability-platform-production"]
 
   # Amazon Managed Grafana
-  role_name           = "observability-platform" # must be "observability-platform"
-  enable_prometheus   = false
-  enable_xray         = false
-  additional_policies = {} # attached to both roles, e.g. { athena = aws_iam_policy.athena.arn }
+  enable_amazon_managed_grafana = true
+  role_name                    = "observability-platform" # must be "observability-platform"
+  enable_prometheus            = false
+  enable_xray                  = false
+  additional_policies          = {} # attached to both enabled roles, e.g. { athena = aws_iam_policy.athena.arn }
 
   # Grafana Cloud
   grafana_cloud = {
@@ -153,15 +154,43 @@ The agent runs as a non-root user with all Linux capabilities dropped. Its root 
 
 Its execution role is named `grafana-pdc-agent-execution`, which the token secret and key policies in Observability Platform trust, so each account can run one agent.
 
+### Grafana Cloud / PDC-only tenants
+
+Tenants that do not use Amazon Managed Grafana, such as Cloud Platform, can disable it independently of Grafana Cloud and PDC:
+
+```hcl
+module "observability_platform_tenant" {
+  source  = "ministryofjustice/observability-platform-tenant/aws"
+  version = "X.X.X"
+
+  enable_amazon_managed_grafana      = false
+  observability_platform_account_id = "111111111111" # replace with the Observability Platform account ID
+
+  grafana_cloud = {
+    pdc_agent = {
+      enabled     = true
+      subnet_ids  = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"] # replace with private subnet IDs
+      privatelink = false # use the internet if Grafana Cloud PDC PrivateLink endpoints are not available
+      allowed_targets = [
+        { cidr_block = "10.26.0.0/21", port = 443 }, # replace with the data sources' CIDRs and ports
+      ]
+    }
+  }
+}
+```
+
+`observability_platform_account_id` remains required: PDC uses it to locate the token secret and trust the token rotator. Enable `pdc_enabled` for the account in Observability Platform and follow the [PDC networking requirements](#querying-data-sources-inside-a-vpc). The `grafana-cloud` role and shared `additional_policies` are still created; the AMG role ARN output is `null`.
+
 ## Inputs
 
 | Name | Description | Default |
 | --- | --- | --- |
 | `observability_platform_account_id` | Account ID of the Observability Platform environment that Amazon Managed Grafana runs in, and that holds the PDC agent's token | Required |
+| `enable_amazon_managed_grafana` | Create the Amazon Managed Grafana role and its policy attachments; independent of Grafana Cloud and PDC | `true` |
 | `role_name` | Name of the Amazon Managed Grafana role, which must be `observability-platform` | `"observability-platform"` |
 | `enable_prometheus` | Attach AmazonPrometheusQueryAccess to the Amazon Managed Grafana role | `false` |
 | `enable_xray` | Attach AWSXrayReadOnlyAccess to the Amazon Managed Grafana role | `false` |
-| `additional_policies` | ARNs of policies to attach to both roles | `{}` |
+| `additional_policies` | ARNs of policies to attach to both enabled roles | `{}` |
 | `grafana_cloud` | Grafana Cloud settings, below | `{}` |
 | `tags` | Tags to apply to resources | `{}` |
 
@@ -187,11 +216,17 @@ Its execution role is named `grafana-pdc-agent-execution`, which the token secre
 
 | Name | Description |
 | --- | --- |
-| `amazon_managed_grafana_role_arn` | ARN of the Amazon Managed Grafana role |
+| `amazon_managed_grafana_role_arn` | ARN of the Amazon Managed Grafana role, or null if it is not enabled |
 | `grafana_cloud_role_arn` | ARN of the Grafana Cloud role, or null if it is not enabled |
 | `grafana_cloud_pdc_agent_execution_role_arn` | ARN of the PDC agent execution role, or null if the agent is not enabled |
 | `grafana_cloud_pdc_agent_restarter_role_arn` | ARN of the PDC agent restarter role, or null if the agent is not enabled |
 | `grafana_cloud_pdc_agent_security_group_id` | ID of the PDC agent security group, or null if the agent is not enabled |
+
+## Upgrading from 3.1.0
+
+No input changes are needed. `enable_amazon_managed_grafana` defaults to `true`. A `moved` block moves `module.amazon_managed_grafana` to `module.amazon_managed_grafana[0]`, so this toggle introduces no resource changes for existing tenants. Terraform reports the address moves, without creating, updating, destroying or replacing the AMG resources. The earlier moves from root resource addresses are retained for older consumers.
+
+Setting the toggle to `false` on an existing tenant **plans destruction of its AMG role and policy attachments**. Only disable it once they are no longer used. For new tenants, `false` skips AMG entirely. Grafana Cloud and PDC are unaffected.
 
 ## Upgrading from 3.0.0
 
@@ -220,6 +255,13 @@ This needs Docker for LocalStack, and `tflocal` from `requirements-dev.txt`. The
 
 ```bash
 terraform test -filter=tests/grafana_cloud.tftest.hcl -filter=tests/grafana_cloud_pdc_agent.tftest.hcl
+```
+
+The AMG toggle tests use plan-only runs with mocked providers (Terraform 1.9 or later), requiring neither Docker nor AWS credentials:
+
+```bash
+terraform init
+terraform test -filter=tests/amazon_managed_grafana.tftest.hcl
 ```
 
 ### Contributing

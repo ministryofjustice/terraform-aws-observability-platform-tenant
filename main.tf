@@ -1,4 +1,5 @@
 module "amazon_managed_grafana" {
+  count  = var.enable_amazon_managed_grafana ? 1 : 0
   source = "./modules/amazon-managed-grafana"
 
   role_name                         = var.role_name
@@ -19,6 +20,11 @@ module "grafana_cloud" {
   additional_policies = merge(var.additional_policies, var.grafana_cloud.additional_policies)
   pdc_agent           = var.grafana_cloud.pdc_agent
   tags                = var.tags
+}
+
+moved {
+  from = module.amazon_managed_grafana
+  to   = module.amazon_managed_grafana[0]
 }
 
 # Resources moved into the Amazon Managed Grafana submodule in 2.1.0, so upgrading does not recreate the role.
